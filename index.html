@@ -7,12 +7,12 @@
     <style>
         body { font-family: Arial, sans-serif; max-width: 400px; margin: 30px auto; padding: 20px; background: #121212; color: #fff; }
         .card { background: #1e1e1e; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        label { display: block; margin-top: 10px; font-weight: bold; }
+        label { display: block; margin-top: 12px; font-weight: bold; font-size: 0.9em; }
         input, select, button { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: none; box-sizing: border-box; }
         input, select { background: #2a2a2a; color: #fff; }
-        button { background: #28a745; color: white; font-weight: bold; margin-top: 15px; cursor: pointer; }
+        button { background: #28a745; color: white; font-weight: bold; margin-top: 18px; cursor: pointer; font-size: 1em; }
         button:hover { background: #218838; }
-        .result { margin-top: 15px; padding: 10px; border-radius: 4px; text-align: center; font-size: 1.1em; font-weight: bold; }
+        .result { margin-top: 15px; padding: 12px; border-radius: 4px; text-align: center; font-size: 1.1em; font-weight: bold; }
         .call { background: #155724; color: #d4edda; }
         .fold { background: #721c24; color: #f8d7da; }
     </style>
@@ -20,15 +20,25 @@
 <body>
 
 <div class="card">
-    <h2>Poker Odds Calculator</h2>
+    <h2 style="text-align: center; margin-top:0;">Poker Decision Maker</h2>
     
-    <label>Jumlah Outs:</label>
-    <input type="number" id="outs" placeholder="Contoh: 8" min="1" max="20">
+    <label>Kondisi Kartu Anda (Outs):</label>
+    <select id="outs">
+        <option value="15">Flush + Straight Draw (15 Outs)</option>
+        <option value="12">Flush + Pair Draw (12 Outs)</option>
+        <option value="9" selected>Flush Draw - Butuh 1 Keriting/Hati/dll (9 Outs)</option>
+        <option value="8">Straight 2 Ujung / Open-Ended (8 Outs)</option>
+        <option value="7">Three of a Kind / Set to Full House (7 Outs)</option>
+        <option value="6">Dua Kartu Over / Overcards (6 Outs)</option>
+        <option value="5">Two Pair ke Full House (4 Outs)</option>
+        <option value="4">Straight 1 Angka Tengah / Gutshot (4 Outs)</option>
+        <option value="2">Pocket Pair ke Set (2 Outs)</option>
+    </select>
 
     <label>Ronde Saat Ini:</label>
     <select id="stage">
-        <option value="4">Flop (Aturan x4)</option>
-        <option value="2">Turn (Aturan x2)</option>
+        <option value="4">Flop (Sisa 2 Kartu / x4)</option>
+        <option value="2">Turn (Sisa 1 Kartu / x2)</option>
     </select>
 
     <label>Isi Pot Saat Ini ($):</label>
@@ -37,7 +47,7 @@
     <label>Biaya Call ($):</label>
     <input type="number" id="call" placeholder="Contoh: 20">
 
-    <button onclick="calculateOdds()">Hitung Keputusan</button>
+    <button onclick="calculateOdds()">HITUNG KEPUTUSAN</button>
 
     <div id="output" class="result" style="display:none;"></div>
 </div>
@@ -49,12 +59,11 @@ function calculateOdds() {
     const currentPot = parseFloat(document.getElementById('pot').value);
     const callAmount = parseFloat(document.getElementById('call').value);
 
-    if (isNaN(outs) || isNaN(currentPot) || isNaN(callAmount)) {
-        alert("Harap isi semua kolom angka!");
+    if (isNaN(currentPot) || isNaN(callAmount)) {
+        alert("Harap isi angka pada kolom Pot dan Biaya Call!");
         return;
     }
 
-    // Hitung Peluang Menang & Pot Odds
     const winProb = outs * multiplier;
     const totalPotAfterCall = currentPot + callAmount;
     const costPercent = (callAmount / totalPotAfterCall) * 100;
