@@ -3,45 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kalkulator Poker Odds IDR</title>
+    <title>Kalkulator Poker Odds RGB</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 450px; margin: 20px auto; padding: 15px; background: #121212; color: #fff; }
-        .card { background: #1e1e1e; padding: 20px; border-radius: 12px; box-shadow: 0 6px 15px rgba(0,0,0,0.5); }
-        h2 { text-align: center; color: #fff; margin-top: 0; }
-        label { display: block; margin-top: 12px; font-weight: 600; font-size: 0.9em; color: #ccc; }
-        select, input, button { width: 100%; padding: 10px; margin-top: 6px; border-radius: 6px; border: none; box-sizing: border-box; font-size: 0.95em; }
-        select, input { background: #2a2a2a; color: #fff; }
-        button { background: #28a745; color: white; font-weight: bold; margin-top: 18px; cursor: pointer; }
-        button:hover { background: #218838; }
-        .result { margin-top: 15px; padding: 12px; border-radius: 8px; text-align: center; font-size: 1.05em; font-weight: bold; }
-        .call { background: #155724; color: #d4edda; border: 1px solid #c3e6cb; }
-        .fold { background: #721c24; color: #f8d7da; border: 1px solid #f5c6cb; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 450px; 
+            margin: 20px auto; 
+            padding: 15px; 
+            background: #0a0a0c; 
+            color: #fff; 
+        }
         
-        .cheat-sheet { margin-top: 20px; padding: 15px; background: #2a2a2a; border-radius: 8px; font-size: 0.85em; color: #ddd; }
-        .cheat-sheet h3 { margin-top: 0; color: #28a745; text-align: center; font-size: 1.05em; border-bottom: 1px solid #444; padding-bottom: 8px; }
-        .cheat-item { margin-bottom: 8px; line-height: 1.4; }
-        .cheat-item strong { color: #fff; }
+        /* Card Utama dengan Bintang Border RGB Glowing */
+        .card { 
+            background: #141419; 
+            padding: 22px; 
+            border-radius: 16px; 
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+        }
+
+        h2 { 
+            text-align: center; 
+            color: #00ffcc; 
+            margin-top: 0; 
+            text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+            letter-spacing: 1px;
+        }
+
+        label { 
+            display: block; 
+            margin-top: 14px; 
+            font-weight: 600; 
+            font-size: 0.9em; 
+            color: #b0b0ba; 
+        }
+
+        select, input { 
+            width: 100%; 
+            padding: 12px; 
+            margin-top: 6px; 
+            border-radius: 8px; 
+            border: 1px solid #2a2a35; 
+            box-sizing: border-box; 
+            font-size: 0.95em; 
+            background: #1e1e26; 
+            color: #fff;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        select:focus, input:focus {
+            border-color: #00ffcc;
+            box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+        }
+
+        /* Tombol Utama Gaya LED RGB Gradient Animation */
+        .btn-rgb {
+            width: 100%;
+            padding: 14px;
+            margin-top: 22px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1em;
+            color: #fff;
+            background: linear-gradient(45deg, #ff0055, #7a00ff, #00e5ff, #ff0055);
+            background-size: 300% 300%;
+            animation: rgbGradient 6s ease infinite;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(122, 0, 255, 0.4);
+            transition: transform 0.2s;
+        }
+
+        .btn-rgb:active {
+            transform: scale(0.98);
+        }
+
+        @keyframes rgbGradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .result { 
+            margin-top: 18px; 
+            padding: 14px; 
+            border-radius: 10px; 
+            text-align: center; 
+            font-size: 1.05em; 
+            font-weight: bold; 
+        }
+
+        .call { 
+            background: rgba(40, 167, 69, 0.15); 
+            color: #2ecc71; 
+            border: 1px solid #2ecc71; 
+            box-shadow: 0 0 12px rgba(46, 204, 113, 0.3);
+        }
+
+        .fold { 
+            background: rgba(220, 53, 69, 0.15); 
+            color: #ff4d4d; 
+            border: 1px solid #ff4d4d; 
+            box-shadow: 0 0 12px rgba(255, 77, 77, 0.3);
+        }
+        
+        .cheat-sheet { 
+            margin-top: 22px; 
+            padding: 15px; 
+            background: #181820; 
+            border-radius: 10px; 
+            font-size: 0.85em; 
+            color: #ccc; 
+            border: 1px solid #2a2a35;
+        }
+
+        .cheat-sheet h3 { 
+            margin-top: 0; 
+            color: #00ffcc; 
+            text-align: center; 
+            font-size: 1.05em; 
+            border-bottom: 1px solid #2a2a35; 
+            padding-bottom: 8px; 
+        }
+
+        .cheat-item { 
+            margin-bottom: 8px; 
+            line-height: 1.4; 
+        }
+
+        /* Penanda Warna Khusus Poin Terpopuler */
+        .hot-item {
+            color: #00ffcc;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>Poker Decision Maker</h2>
+    <h2>POKER DECISION MAKER</h2>
     
     <label>Kondisi Kartu Anda (Outs):</label>
     <select id="outs">
-        <optgroup label="Draws (Ngejar Kartu Jadi)">
-            <option value="15">Kurang 1 Kartu untuk Straight / Flush (15 Outs)</option>
-            <option value="12">Kurang 1 Kartu Flush / Pair Tinggi (12 Outs)</option>
-            <option value="9" selected>Kurang 1 Kartu Sejenis untuk Flush (9 Outs)</option>
-            <option value="8">Kurang 1 Angka Ujung untuk Straight (8 Outs)</option>
-            <option value="4">Kurang 1 Angka Tengah untuk Straight (4 Outs)</option>
+        <!-- Opsi Paling Sering Dipakai Ditandai [SERING] -->
+        <optgroup label="★ PALING SERING DIPAKAI (DRAWS)">
+            <option value="9" selected>🔥 [SERING] Flush Draw - Kurang 1 Sejenis (9 Outs)</option>
+            <option value="8">🔥 [SERING] Straight 2 Ujung - Kurang 1 Ujung (8 Outs)</option>
+            <option value="15">🔥 [SERING] Flush + Straight Draw (15 Outs)</option>
+            <option value="12">🔥 [SERING] Flush + Pair Draw (12 Outs)</option>
+            <option value="4">🔥 [SERING] Straight Gutshot - Bolong Tengah (4 Outs)</option>
         </optgroup>
-        <optgroup label="Made Hands (Ngejar Kartu Lebih Tinggi)">
-            <option value="10">Punya Three of a Kind (3 Kembar) -> Ngejar Full House (10 Outs)</option>
-            <option value="7">Punya Two Pair (2 Pasang) -> Ngejar Full House (4 Outs)</option>
-            <option value="6">Punya 2 Kartu Tinggi Tanpa Pair (6 Outs)</option>
-            <option value="2">Punya Pair di Tangan -> Ngejar 3 Kembar (2 Outs)</option>
+        <optgroup label="⚙️ LAINNYA (MADE HANDS)">
+            <option value="10">Three of a Kind -> Full House (10 Outs)</option>
+            <option value="7">Two Pair -> Full House (4 Outs)</option>
+            <option value="6">Dua Kartu Over / Overcards (6 Outs)</option>
+            <option value="2">Pair di Tangan -> Set (2 Outs)</option>
         </optgroup>
     </select>
 
@@ -57,21 +176,22 @@
     <label>Biaya Call (Rp):</label>
     <input type="number" id="call" placeholder="Contoh: 2400">
 
-    <button onclick="calculateOdds()">HITUNG KEPUTUSAN</button>
+    <button class="btn-rgb" onclick="calculateOdds()">HITUNG KEPUTUSAN</button>
 
     <div id="output" class="result" style="display:none;"></div>
 
     <div class="cheat-sheet">
         <h3>PANDUAN KARTU (UNTUK DIHAFAL)</h3>
-        <div class="cheat-item"><strong>15 Outs:</strong> Kurang 1 kartu lagi untuk Flush ATAU Straight.</div>
-        <div class="cheat-item"><strong>12 Outs:</strong> Kurang 1 kartu sejenis (Flush) ATAU kartu tinggi (Pair).</div>
-        <div class="cheat-item"><strong>9 Outs:</strong> Kurang 1 kartu sejenis untuk jadi Flush.</div>
-        <div class="cheat-item"><strong>8 Outs:</strong> Kurang 1 angka di ujung atas/bawah untuk Straight.</div>
-        <div class="cheat-item"><strong>10 Outs:</strong> Punya 3 kembar -> cari 1 kartu lagi untuk Full House.</div>
-        <div class="cheat-item"><strong>6 Outs:</strong> Punya kartu tinggi -> cari kartu As/King agar jadi Pair.</div>
-        <div class="cheat-item"><strong>4 Outs (Two Pair):</strong> Punya 2 pasang -> cari 1 kartu lagi untuk Full House.</div>
-        <div class="cheat-item"><strong>4 Outs (Gutshot):</strong> Kurang 1 angka bolong di tengah untuk Straight.</div>
-        <div class="cheat-item"><strong>2 Outs:</strong> Punya Pair di tangan -> cari 1 kartu lagi untuk 3 Kembar.</div>
+        <div class="cheat-item hot-item">★ 9 Outs: Kurang 1 kartu sejenis untuk Flush.</div>
+        <div class="cheat-item hot-item">★ 8 Outs: Kurang 1 angka di ujung untuk Straight.</div>
+        <div class="cheat-item hot-item">★ 15 Outs: Kurang 1 kartu untuk Flush ATAU Straight.</div>
+        <div class="cheat-item hot-item">★ 12 Outs: Kurang 1 kartu sejenis (Flush) ATAU Pair.</div>
+        <div class="cheat-item hot-item">★ 4 Outs (Gutshot): Kurang 1 angka bolong tengah.</div>
+        <hr style="border:0; border-top:1px solid #2a2a35; margin:10px 0;">
+        <div class="cheat-item">10 Outs: Punya 3 kembar -> cari 1 kartu lagi untuk Full House.</div>
+        <div class="cheat-item">6 Outs: Punya kartu tinggi -> cari kartu As/King agar jadi Pair.</div>
+        <div class="cheat-item">4 Outs (Two Pair): Punya 2 pasang -> cari 1 kartu lagi untuk Full House.</div>
+        <div class="cheat-item">2 Outs: Punya Pair di tangan -> cari 1 kartu lagi untuk 3 Kembar.</div>
     </div>
 </div>
 
@@ -101,7 +221,7 @@ function calculateOdds() {
     outputDiv.innerHTML = `
         Peluang Menang: ${winProb}%<br>
         Biaya Taruhan: ${costPercent.toFixed(1)}%<br>
-        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.2); margin:8px 0;">
+        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.15); margin:8px 0;">
         Rekomendasi: <strong>${recommendation}</strong>
     `;
 }
