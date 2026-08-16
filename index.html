@@ -5,17 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kalkulator Poker Odds IDR</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 450px; margin: 30px auto; padding: 20px; background: #121212; color: #fff; }
-        .card { background: #1e1e1e; padding: 25px; border-radius: 12px; box-shadow: 0 6px 15px rgba(0,0,0,0.5); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 450px; margin: 20px auto; padding: 15px; background: #121212; color: #fff; }
+        .card { background: #1e1e1e; padding: 20px; border-radius: 12px; box-shadow: 0 6px 15px rgba(0,0,0,0.5); }
         h2 { text-align: center; color: #fff; margin-top: 0; }
-        label { display: block; margin-top: 15px; font-weight: 600; font-size: 0.95em; color: #ccc; }
-        select, input, button { width: 100%; padding: 12px; margin-top: 8px; border-radius: 6px; border: none; box-sizing: border-box; font-size: 1em; }
+        label { display: block; margin-top: 12px; font-weight: 600; font-size: 0.9em; color: #ccc; }
+        select, input, button { width: 100%; padding: 10px; margin-top: 6px; border-radius: 6px; border: none; box-sizing: border-box; font-size: 0.95em; }
         select, input { background: #2a2a2a; color: #fff; }
-        button { background: #28a745; color: white; font-weight: bold; margin-top: 25px; cursor: pointer; transition: background 0.3s; }
+        button { background: #28a745; color: white; font-weight: bold; margin-top: 18px; cursor: pointer; }
         button:hover { background: #218838; }
-        .result { margin-top: 20px; padding: 15px; border-radius: 8px; text-align: center; font-size: 1.1em; font-weight: bold; }
+        .result { margin-top: 15px; padding: 12px; border-radius: 8px; text-align: center; font-size: 1.05em; font-weight: bold; }
         .call { background: #155724; color: #d4edda; border: 1px solid #c3e6cb; }
         .fold { background: #721c24; color: #f8d7da; border: 1px solid #f5c6cb; }
+        
+        /* CSS untuk Panduan Hafalan */
+        .cheat-sheet { margin-top: 20px; padding: 15px; background: #2a2a2a; border-radius: 8px; font-size: 0.82em; color: #ddd; }
+        .cheat-sheet h3 { margin-top: 0; color: #28a745; text-align: center; font-size: 1.05em; border-bottom: 1px solid #444; padding-bottom: 8px; }
+        .cheat-item { margin-bottom: 8px; line-height: 1.35; }
+        .cheat-item strong { color: #fff; }
     </style>
 </head>
 <body>
@@ -55,6 +61,20 @@
     <button onclick="calculateOdds()">HITUNG KEPUTUSAN</button>
 
     <div id="output" class="result" style="display:none;"></div>
+
+    <!-- Panduan Hafalan Keterangan Kartu -->
+    <div class="cheat-sheet">
+        <h3>PANDUAN KARTU (UNTUK DIHAFAL)</h3>
+        <div class="cheat-item"><strong>15 Outs:</strong> Flush + Straight (Kurang 1 kartu sejenis ATAU urutan)</div>
+        <div class="cheat-item"><strong>12 Outs:</strong> Flush + Pair (Kurang 1 kartu sejenis ATAU kartu tinggi)</div>
+        <div class="cheat-item"><strong>9 Outs:</strong> Flush Draw (Punya 4 sejenis, kurang 1 kartu lagi)</div>
+        <div class="cheat-item"><strong>8 Outs:</strong> Straight 2 Ujung (Urut 4 angka, incari ujung atas/bawah)</div>
+        <div class="cheat-item"><strong>10 Outs:</strong> Three of a Kind (Punya 3 kembar $\rightarrow$ incari Full House)</div>
+        <div class="cheat-item"><strong>6 Outs:</strong> Dua Kartu Over (Pegangan lebih tinggi dari meja)</div>
+        <div class="cheat-item"><strong>4 Outs (Two Pair):</strong> Punya 2 Pasang $\rightarrow$ incari Full House</div>
+        <div class="cheat-item"><strong>4 Outs (Gutshot):</strong> Straight bolong 1 angka di tengah</div>
+        <div class="cheat-item"><strong>2 Outs:</strong> Pair di tangan $\rightarrow$ incari 1 kartu lagi biar Set/3 Kembar</div>
+    </div>
 </div>
 
 <script>
@@ -83,7 +103,7 @@ function calculateOdds() {
     outputDiv.innerHTML = `
         Peluang Menang: ${winProb}%<br>
         Biaya Taruhan: ${costPercent.toFixed(1)}%<br>
-        <hr>
+        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.2); margin:8px 0;">
         Rekomendasi: <strong>${recommendation}</strong>
     `;
 }
