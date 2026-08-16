@@ -3,36 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kalkulator Poker Odds</title>
+    <title>Kalkulator Poker Odds IDR</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 400px; margin: 30px auto; padding: 20px; background: #121212; color: #fff; }
-        .card { background: #1e1e1e; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        label { display: block; margin-top: 12px; font-weight: bold; font-size: 0.9em; }
-        input, select, button { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: none; box-sizing: border-box; }
-        input, select { background: #2a2a2a; color: #fff; }
-        button { background: #28a745; color: white; font-weight: bold; margin-top: 18px; cursor: pointer; font-size: 1em; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 450px; margin: 30px auto; padding: 20px; background: #121212; color: #fff; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 12px; box-shadow: 0 6px 15px rgba(0,0,0,0.5); }
+        h2 { text-align: center; color: #fff; margin-top: 0; }
+        label { display: block; margin-top: 15px; font-weight: 600; font-size: 0.95em; color: #ccc; }
+        select, input, button { width: 100%; padding: 12px; margin-top: 8px; border-radius: 6px; border: none; box-sizing: border-box; font-size: 1em; }
+        select, input { background: #2a2a2a; color: #fff; }
+        button { background: #28a745; color: white; font-weight: bold; margin-top: 25px; cursor: pointer; transition: background 0.3s; }
         button:hover { background: #218838; }
-        .result { margin-top: 15px; padding: 12px; border-radius: 4px; text-align: center; font-size: 1.1em; font-weight: bold; }
-        .call { background: #155724; color: #d4edda; }
-        .fold { background: #721c24; color: #f8d7da; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 8px; text-align: center; font-size: 1.1em; font-weight: bold; }
+        .call { background: #155724; color: #d4edda; border: 1px solid #c3e6cb; }
+        .fold { background: #721c24; color: #f8d7da; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2 style="text-align: center; margin-top:0;">Poker Decision Maker</h2>
+    <h2>Poker Decision Maker</h2>
     
     <label>Kondisi Kartu Anda (Outs):</label>
     <select id="outs">
-        <option value="15">Flush + Straight Draw (15 Outs)</option>
-        <option value="12">Flush + Pair Draw (12 Outs)</option>
-        <option value="9" selected>Flush Draw - Butuh 1 Keriting/Hati/dll (9 Outs)</option>
-        <option value="8">Straight 2 Ujung / Open-Ended (8 Outs)</option>
-        <option value="7">Three of a Kind / Set to Full House (7 Outs)</option>
-        <option value="6">Dua Kartu Over / Overcards (6 Outs)</option>
-        <option value="5">Two Pair ke Full House (4 Outs)</option>
-        <option value="4">Straight 1 Angka Tengah / Gutshot (4 Outs)</option>
-        <option value="2">Pocket Pair ke Set (2 Outs)</option>
+        <optgroup label="Draws (Berharap Kartu Selanjutnya)">
+            <option value="15">Flush + Straight Draw (15 Outs)</option>
+            <option value="12">Flush + Pair Draw (12 Outs)</option>
+            <option value="9" selected>Flush Draw - Butuh 1 Keriting/Hati/dll (9 Outs)</option>
+            <option value="8">Straight Open-Ended/2 Ujung (8 Outs)</option>
+            <option value="4">Straight Gutshot/1 Angka Tengah (4 Outs)</option>
+        </optgroup>
+        <optgroup label="Made Hands (Meningkatkan ke Kombinasi Lebih Tinggi)">
+            <option value="10">Three of a Kind ke Full House/Four of a Kind (10 Outs)</option>
+            <option value="7">Two Pair ke Full House (4 Outs)</option>
+            <option value="6">Dua Kartu Over / Overcards (6 Outs)</option>
+            <option value="2">Pair ke Set/Three of a Kind (2 Outs)</option>
+        </optgroup>
     </select>
 
     <label>Ronde Saat Ini:</label>
@@ -41,11 +46,11 @@
         <option value="2">Turn (Sisa 1 Kartu / x2)</option>
     </select>
 
-    <label>Isi Pot Saat Ini ($):</label>
-    <input type="number" id="pot" placeholder="Contoh: 100">
+    <label>Isi Pot Saat Ini (Rp):</label>
+    <input type="number" id="pot" placeholder="Contoh: 12000">
 
-    <label>Biaya Call ($):</label>
-    <input type="number" id="call" placeholder="Contoh: 20">
+    <label>Biaya Call (Rp):</label>
+    <input type="number" id="call" placeholder="Contoh: 2400">
 
     <button onclick="calculateOdds()">HITUNG KEPUTUSAN</button>
 
