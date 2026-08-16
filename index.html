@@ -17,10 +17,9 @@
         .call { background: #155724; color: #d4edda; border: 1px solid #c3e6cb; }
         .fold { background: #721c24; color: #f8d7da; border: 1px solid #f5c6cb; }
         
-        /* CSS untuk Panduan Hafalan */
-        .cheat-sheet { margin-top: 20px; padding: 15px; background: #2a2a2a; border-radius: 8px; font-size: 0.82em; color: #ddd; }
+        .cheat-sheet { margin-top: 20px; padding: 15px; background: #2a2a2a; border-radius: 8px; font-size: 0.85em; color: #ddd; }
         .cheat-sheet h3 { margin-top: 0; color: #28a745; text-align: center; font-size: 1.05em; border-bottom: 1px solid #444; padding-bottom: 8px; }
-        .cheat-item { margin-bottom: 8px; line-height: 1.35; }
+        .cheat-item { margin-bottom: 8px; line-height: 1.4; }
         .cheat-item strong { color: #fff; }
     </style>
 </head>
@@ -31,18 +30,18 @@
     
     <label>Kondisi Kartu Anda (Outs):</label>
     <select id="outs">
-        <optgroup label="Draws (Berharap Kartu Selanjutnya)">
-            <option value="15">Flush + Straight Draw (15 Outs)</option>
-            <option value="12">Flush + Pair Draw (12 Outs)</option>
-            <option value="9" selected>Flush Draw - Butuh 1 Keriting/Hati/dll (9 Outs)</option>
-            <option value="8">Straight Open-Ended/2 Ujung (8 Outs)</option>
-            <option value="4">Straight Gutshot/1 Angka Tengah (4 Outs)</option>
+        <optgroup label="Draws (Ngejar Kartu Jadi)">
+            <option value="15">Kurang 1 Kartu untuk Straight / Flush (15 Outs)</option>
+            <option value="12">Kurang 1 Kartu Flush / Pair Tinggi (12 Outs)</option>
+            <option value="9" selected>Kurang 1 Kartu Sejenis untuk Flush (9 Outs)</option>
+            <option value="8">Kurang 1 Angka Ujung untuk Straight (8 Outs)</option>
+            <option value="4">Kurang 1 Angka Tengah untuk Straight (4 Outs)</option>
         </optgroup>
-        <optgroup label="Made Hands (Meningkatkan ke Kombinasi Lebih Tinggi)">
-            <option value="10">Three of a Kind ke Full House/Four of a Kind (10 Outs)</option>
-            <option value="7">Two Pair ke Full House (4 Outs)</option>
-            <option value="6">Dua Kartu Over / Overcards (6 Outs)</option>
-            <option value="2">Pair ke Set/Three of a Kind (2 Outs)</option>
+        <optgroup label="Made Hands (Ngejar Kartu Lebih Tinggi)">
+            <option value="10">Punya Three of a Kind (3 Kembar) -> Ngejar Full House (10 Outs)</option>
+            <option value="7">Punya Two Pair (2 Pasang) -> Ngejar Full House (4 Outs)</option>
+            <option value="6">Punya 2 Kartu Tinggi Tanpa Pair (6 Outs)</option>
+            <option value="2">Punya Pair di Tangan -> Ngejar 3 Kembar (2 Outs)</option>
         </optgroup>
     </select>
 
@@ -62,18 +61,17 @@
 
     <div id="output" class="result" style="display:none;"></div>
 
-    <!-- Panduan Hafalan Keterangan Kartu -->
     <div class="cheat-sheet">
         <h3>PANDUAN KARTU (UNTUK DIHAFAL)</h3>
-        <div class="cheat-item"><strong>15 Outs:</strong> Flush + Straight (Kurang 1 kartu sejenis ATAU urutan)</div>
-        <div class="cheat-item"><strong>12 Outs:</strong> Flush + Pair (Kurang 1 kartu sejenis ATAU kartu tinggi)</div>
-        <div class="cheat-item"><strong>9 Outs:</strong> Flush Draw (Punya 4 sejenis, kurang 1 kartu lagi)</div>
-        <div class="cheat-item"><strong>8 Outs:</strong> Straight 2 Ujung (Urut 4 angka, incari ujung atas/bawah)</div>
-        <div class="cheat-item"><strong>10 Outs:</strong> Three of a Kind (Punya 3 kembar $\rightarrow$ incari Full House)</div>
-        <div class="cheat-item"><strong>6 Outs:</strong> Dua Kartu Over (Pegangan lebih tinggi dari meja)</div>
-        <div class="cheat-item"><strong>4 Outs (Two Pair):</strong> Punya 2 Pasang $\rightarrow$ incari Full House</div>
-        <div class="cheat-item"><strong>4 Outs (Gutshot):</strong> Straight bolong 1 angka di tengah</div>
-        <div class="cheat-item"><strong>2 Outs:</strong> Pair di tangan $\rightarrow$ incari 1 kartu lagi biar Set/3 Kembar</div>
+        <div class="cheat-item"><strong>15 Outs:</strong> Kurang 1 kartu lagi untuk Flush ATAU Straight.</div>
+        <div class="cheat-item"><strong>12 Outs:</strong> Kurang 1 kartu sejenis (Flush) ATAU kartu tinggi (Pair).</div>
+        <div class="cheat-item"><strong>9 Outs:</strong> Kurang 1 kartu sejenis untuk jadi Flush.</div>
+        <div class="cheat-item"><strong>8 Outs:</strong> Kurang 1 angka di ujung atas/bawah untuk Straight.</div>
+        <div class="cheat-item"><strong>10 Outs:</strong> Punya 3 kembar -> cari 1 kartu lagi untuk Full House.</div>
+        <div class="cheat-item"><strong>6 Outs:</strong> Punya kartu tinggi -> cari kartu As/King agar jadi Pair.</div>
+        <div class="cheat-item"><strong>4 Outs (Two Pair):</strong> Punya 2 pasang -> cari 1 kartu lagi untuk Full House.</div>
+        <div class="cheat-item"><strong>4 Outs (Gutshot):</strong> Kurang 1 angka bolong di tengah untuk Straight.</div>
+        <div class="cheat-item"><strong>2 Outs:</strong> Punya Pair di tangan -> cari 1 kartu lagi untuk 3 Kembar.</div>
     </div>
 </div>
 
