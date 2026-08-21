@@ -9,7 +9,6 @@ export class PokerEvaluator {
     return [...withHead, ...withoutHead];
   }
 
-  // Evaluasi khusus 5 Kartu
   static evaluate5CardHand(cards) {
     const sorted = [...cards].sort((a, b) => b.rank.value - a.rank.value);
     const isFlush = sorted.every(c => c.suit.symbol === sorted[0].suit.symbol);
@@ -47,11 +46,9 @@ export class PokerEvaluator {
     return { rankName: 'High Card', score: 1, cards: sorted };
   }
 
-  // Cari Kombinasi 5 Kartu Terbaik dari sekumpulan kartu
   static getBestHand(cards) {
     if (cards.length < 5) {
       if (cards.length === 0) return { rankName: '-', cards: [] };
-      // Evaluasi Parsial untuk kartu < 5
       const counts = {};
       cards.forEach(c => counts[c.rank.label] = (counts[c.rank.label] || 0) + 1);
       const pairs = Object.entries(counts).filter(([_, count]) => count === 2);
@@ -75,71 +72,103 @@ export class PokerEvaluator {
     return bestHand;
   }
 
-  // Mengevaluasi Khusus Kartu Komunitas Murni (Board Only)
-  static evaluateBoardOnly(communityCards) {
-    if (communityCards.length === 0) return "Belum ada kartu meja";
-    return this.getBestHand(communityCards).rankName;
-  }
-
-  // Mengecek Potensi Ancaman Kartu Meja Bagi Pemain Lain
+  // Menghitung Kartu Terkuat (The Nuts) yang meng-counter kartu meja
   static analyzeBoardThreats(communityCards) {
-    if (communityCards.length < 3) return [{ text: "Menunggu Flop (min 3 kartu meja)", safe: true }];
+    if (communityCards.length < 3) {
+      return [{ text: "Masukkan minimal 3 Kartu Komunitas untuk menganalisis potensi.", safe: true, nutText: "" }];
+    }
 
     const threats = [];
 
-    // 1. Cek Potensi Flush di Meja
+    // 1. Analisis Flush & Nut Flush Counter
     const suitCounts = {};
     communityCards.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
-    
-    Object.entries(suitCounts).forEach(([suit, count]) => {
-      if (count >= 5) {
-        threats.push({ text: `⚠️ WARNING: Meja sudah membentuk FLUSH (${suit})!`, safe: false });
-      } else if (count === 4) {
-        threats.push({ text: `⚠️ Ancaman Flush Tinggi! Ada 4 kartu ${suit} di meja.`, safe: false });
-      } else if (count === 3) {
-        threats.push({ text: `⚡ Potensi Flush: Ada 3 kartu ${suit} di meja.`, safe: true });
+
+    Object.entries(suitCounts).forEach(([suitSymbol, count]) => {
+      if (count >= 3) {
+        // Cari kartu bernilai tertinggi yang BELUM ada di meja untuk simbol tersebut
+        const usedRanks = communityCards
+          .filter(c => c.suit.symbol === suitSymbol)
+          .map(c => c.rank.value);
+
+        let nutRanks = [];
+        if (!usedRanks.includes(14)) nutRanks.push('A');
+        if (!usedRanks.includes(13)) nutRanks.push('K');
+        if (!usedRanks.includes(12) && nutRanks.length < 2) nutRanks.push('Q');
+        if (!usedRanks.includes(11) && nutRanks.length < 2) nutRanks.push('J');
+
+        const needCount = count >= 5 ? 1 : 5 - count;
+        const statusText = count >= 5 
+          ? `⚠️ Meja SUDAH Flush (${suitSymbol})!` 
+          : `⚡ Potensi Flush Lawan: Ada ${count} kartu ${suitSymbol} di meja.`;
+
+        threats.push({
+          text: statusText,
+          safe: count < 4,
+          nutText: `👉 Nut Flush terkuat butuh kartu pegangan: [${nutRanks.slice(0, needCount).join(' + ')}] (${suitSymbol})`
+        });
       }
     });
 
-    // 2. Cek Potensi Pair / Full House di Meja
+    // 2. Analisis Straight & Nut Straight Counter
+    const boardValues = [...new Set(communityCards.map(c => c.rank.value))].sort((a,b) => a - b);
+    let straightNutText = "";
+
+    // Cek kemungkinan 5 urutan angka
+    for (let highVal = 14; highVal >= 5; highVal--) {
+      const targetSeq = [highVal, highVal-1, highVal-2, highVal-3, highVal-4];
+      const matchCount = targetSeq.filter(v => boardValues.includes(v)).length;
+
+      if (matchCount >= 3) {
+        const missingVals = targetSeq.filter(v => !boardValues.includes(v));
+        const valToLabel = v => v === 14 ? 'A' : v === 13 ? 'K' : v === 12 ? 'Q' : v === 11 ? 'J' : v.toString();
+        
+        straightNutText = `👉 Nut Straight terkuat butuh kartu pegangan: [${missingVals.map(valToLabel).join(' + ')}]`;
+        
+        threats.push({
+          text: `🎯 Ancaman Straight: Ada urutan kartu bersambung di meja.`,
+          safe: matchCount < 4,
+          nutText: straightNutText
+        });
+        break; // Tampilkan hanya yang paling tinggi (Nut Straight)
+      }
+    }
+
+    // 3. Analisis Pair / Full House di Meja
     const rankCounts = {};
     communityCards.forEach(c => rankCounts[c.rank.label] = (rankCounts[c.rank.label] || 0) + 1);
     
-    let pairs = 0, trips = 0;
-    Object.values(rankCounts).forEach(cnt => {
-      if (cnt === 2) pairs++;
-      if (cnt === 3) trips++;
+    let pairs = [], trips = [];
+    Object.entries(rankCounts).forEach(([label, cnt]) => {
+      if (cnt === 2) pairs.push(label);
+      if (cnt === 3) trips.push(label);
     });
 
-    if (trips > 0 || pairs >= 2) {
-      threats.push({ text: `⚠️ Ancaman Full House / Four of a Kind di meja!`, safe: false });
-    } else if (pairs === 1) {
-      threats.push({ text: `⚡ Ada Pair di meja (Potensi Trips/Full House lawan).`, safe: true });
-    }
-
-    // 3. Cek Potensi Straight di Meja
-    const values = [...new Set(communityCards.map(c => c.rank.value))].sort((a,b) => a - b);
-    if (values.length >= 3) {
-      let straightPotential = false;
-      for (let i = 0; i <= values.length - 3; i++) {
-        if (values[i+2] - values[i] <= 4) {
-          straightPotential = true;
-          break;
-        }
-      }
-      if (straightPotential) {
-        threats.push({ text: `🎯 Ancaman Straight: Kartu meja saling bersambungan.`, safe: true });
-      }
+    if (trips.length > 0 || pairs.length >= 2) {
+      threats.push({
+        text: `⚠️ Ancaman Full House / Four of a Kind di meja!`,
+        safe: false,
+        nutText: `👉 Kartu Counter Terkuat: Pemain yang memegang Pair kartu tertinggi di meja.`
+      });
+    } else if (pairs.length === 1) {
+      threats.push({
+        text: `⚡ Ada Pair (${pairs[0]}) di meja.`,
+        safe: true,
+        nutText: `👉 Counter Terkuat lawan: Pegang kartu [${pairs[0]}] untuk Three of a Kind / Full House.`
+      });
     }
 
     if (threats.length === 0) {
-      threats.push({ text: "✅ Meja relatif aman (Dry Board / Tidak ada koneksi kuat).", safe: true });
+      threats.push({
+        text: "✅ Meja aman (Dry Board / Tidak ada potensi Flush/Straight tinggi).",
+        safe: true,
+        nutText: ""
+      });
     }
 
     return threats;
   }
 
-  // Kalkulasi Win Equity Kartu Tangan Anda
   static calculateStrength(handCards, communityCards) {
     if (handCards.length === 0) return 0;
     const total = [...handCards, ...communityCards];
