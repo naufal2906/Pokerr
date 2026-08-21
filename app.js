@@ -2,8 +2,8 @@ import { Card, RANKS, SUITS } from './card.js';
 import { PokerEvaluator } from './evaluator.js';
 import { PokerStrategy } from './strategy.js';
 
-let currentHand = [null, null]; // Slot 2 Kartu Tangan
-let currentCommunity = [null, null, null, null, null]; // Slot 5 Kartu Komunitas
+let currentHand = [null, null];
+let currentCommunity = [null, null, null, null, null];
 let activeTarget = { type: 'hand', index: 0 };
 
 function createFilledCardUI(card, onClickRemove) {
@@ -51,7 +51,21 @@ function updateEvaluation() {
   if (strengthBar) strengthBar.style.width = `${percentage}%`;
   if (strengthPercent) strengthPercent.innerText = `${percentage}%`;
 
-  // 3. Analisis Potensi Ancaman
+  // 3. Render Notifikasi Potensi Draw (Straight/Flush Draw)
+  const draws = PokerEvaluator.detectDraws(activeHandCards, activeCommunityCards);
+  let drawNoticeEl = document.getElementById('draw-notice-container');
+  if (!drawNoticeEl) {
+    drawNoticeEl = document.createElement('div');
+    drawNoticeEl.id = 'draw-notice-container';
+    drawNoticeEl.style.cssText = 'margin: 8px 0; font-size: 0.85rem; color: #00f2fe;';
+    const stratBox = document.getElementById('strat-reason')?.parentNode;
+    if (stratBox) stratBox.insertBefore(drawNoticeEl, document.getElementById('strat-reason'));
+  }
+  if (drawNoticeEl) {
+    drawNoticeEl.innerHTML = draws.length > 0 ? draws.join('<br>') : '';
+  }
+
+  // 4. Analisis Potensi Ancaman & Counter Kartu Terkuat (The Nuts)
   const threatContainer = document.getElementById('board-threats');
   if (threatContainer) {
     threatContainer.innerHTML = '';
@@ -61,14 +75,15 @@ function updateEvaluation() {
       const div = document.createElement('div');
       div.className = `potential-item ${t.safe ? 'safe' : ''}`;
       div.innerHTML = `
-        <div>${t.text}</div>
-        ${t.nutText ? `<span class="nut-card" style="display:block; font-size:0.8rem; color:#ff4d4d; margin-top:4px;">${t.nutText}</span>` : ''}
+        <div style="font-weight:bold; font-size:0.95rem; margin-bottom:4px; color:#fff;">${t.text}</div>
+        <div style="font-size:0.85rem; color:#00f2fe; margin-bottom:4px;">📊 <b>Potensi Meja:</b> ${t.boardPotential}</div>
+        <div style="font-size:0.85rem; color:#ff4d4d;">${t.worstCase}</div>
       `;
       threatContainer.appendChild(div);
     });
   }
 
-  // 4. Kombinasi Terbaik Saat Ini
+  // 5. Kombinasi Terbaik Saat Ini
   const resultNameEl = document.getElementById('result-name');
   const bestGroup = document.getElementById('best-cards');
   if (bestGroup) bestGroup.innerHTML = '';
@@ -82,14 +97,13 @@ function updateEvaluation() {
     if (resultNameEl) resultNameEl.innerText = "Masukkan Kartu Tangan / Komunitas";
   }
 
-  // 5. Pembaharuan Saran Betting Strategi (Panggil getStrategy)
+  // 6. Pembaharuan Saran Betting Strategi
   const strat = PokerStrategy.getStrategy(activeHandCards, activeCommunityCards, myBest);
   
   const actionEl = document.getElementById('strat-action');
   if (actionEl) {
     actionEl.innerText = strat.action;
     
-    // Penyesuaian Warna Border
     if (strat.action.includes('RAISE') || strat.action.includes('ALL-IN')) {
       actionEl.style.borderColor = '#00ff87';
       actionEl.style.color = '#00ff87';
@@ -115,7 +129,6 @@ function renderBoard() {
   if (handContainer) handContainer.innerHTML = '';
   if (commContainer) commContainer.innerHTML = '';
 
-  // Render Slot Kartu Tangan (2 Slot)
   currentHand.forEach((card, index) => {
     if (!handContainer) return;
     if (card) {
@@ -128,7 +141,6 @@ function renderBoard() {
     }
   });
 
-  // Render Slot Kartu Komunitas (5 Slot)
   currentCommunity.forEach((card, index) => {
     if (!commContainer) return;
     if (card) {
@@ -155,7 +167,7 @@ document.getElementById('btn-clear-comm')?.addEventListener('click', () => {
   renderBoard();
 });
 
-// Modal Picker (Layout 8 Baris)
+// Modal Picker (8 Baris)
 const modal = document.getElementById('card-picker-modal');
 const fullCardGrid = document.getElementById('full-card-grid');
 
@@ -177,10 +189,9 @@ function renderFullCardGrid() {
   const chosenCards = [...currentHand, ...currentCommunity].filter(c => c !== null);
   const suits = [SUITS.SPADES, SUITS.HEARTS, SUITS.CLUBS, SUITS.DIAMONDS];
   
-  // Mengurutkan Kartu A s/d 2
   const allRanks = [...RANKS].reverse(); 
-  const ranksHigh = allRanks.slice(0, 7); // A - 8 (7 kartu)
-  const ranksLow = allRanks.slice(7);     // 7 - 2 (6 kartu)
+  const ranksHigh = allRanks.slice(0, 7); // A - 8
+  const ranksLow = allRanks.slice(7);     // 7 - 2
 
   suits.forEach(suit => {
     // Baris 1: High Cards
