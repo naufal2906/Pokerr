@@ -1,46 +1,52 @@
 import { Card, RANKS, SUITS } from './card.js';
 import { PokerEvaluator } from './evaluator.js';
 
-let currentHand = [];
-let currentCommunity = [];
-let activeTarget = null;
-let selectedSuit = null;
+let currentHand = [null, null]; // Slot 2 Kartu Tangan
+let currentCommunity = [null, null, null, null, null]; // Slot 5 Kartu Komunitas
+let activeTarget = { type: 'hand', index: 0 };
 
-function createCardUI(card, isClickable = false, onDeleteCallback = null) {
+function createFilledCardUI(card, onClickRemove) {
   const cardDiv = document.createElement('div');
-  cardDiv.className = `card ${card.suit.color} ${isClickable ? 'clickable' : ''}`;
+  cardDiv.className = `card filled ${card.suit.color}`;
   cardDiv.innerHTML = `
     <div>${card.rank.label}</div>
     <div style="text-align: center;">${card.suit.symbol}</div>
   `;
+  cardDiv.title = "Klik untuk menghapus kartu";
+  cardDiv.addEventListener('click', onClickRemove);
+  return cardDiv;
+}
 
-  if (isClickable && onDeleteCallback) {
-    cardDiv.title = "Klik untuk menghapus kartu ini";
-    cardDiv.addEventListener('click', onDeleteCallback);
-  }
-
+function createPlaceholderUI(onClickOpen) {
+  const cardDiv = document.createElement('div');
+  cardDiv.className = "card placeholder";
+  cardDiv.innerText = "+";
+  cardDiv.title = "Klik untuk menambahkan kartu";
+  cardDiv.addEventListener('click', onClickOpen);
   return cardDiv;
 }
 
 function updateEvaluation() {
-  const totalCards = [...currentHand, ...currentCommunity];
+  const activeHandCards = currentHand.filter(c => c !== null);
+  const activeCommunityCards = currentCommunity.filter(c => c !== null);
+  const totalCards = [...activeHandCards, ...activeCommunityCards];
 
-  // 1. Kombinasi Kartu Tangan Murni
+  // 1. Evaluasi Kartu Tangan Murni
   document.getElementById('hole-only-hand').innerText = 
-    PokerEvaluator.evaluateHoleCardsOnly(currentHand);
+    PokerEvaluator.evaluateHoleCardsOnly(activeHandCards);
 
-  // 2. Evaluasi Tangan Sendiri + Board & Win Equity
+  // 2. Evaluasi Tangan + Meja & Win Equity
   const myBest = PokerEvaluator.getBestHand(totalCards);
   document.getElementById('my-best-hand').innerText = myBest.rankName;
 
-  const percentage = PokerEvaluator.calculateStrength(currentHand, currentCommunity);
+  const percentage = PokerEvaluator.calculateStrength(activeHandCards, activeCommunityCards);
   document.getElementById('strength-bar').style.width = `${percentage}%`;
   document.getElementById('strength-percent').innerText = `${percentage}%`;
 
   // 3. Analisis Potensi Ancaman & Counter Kartu Terkuat (The Nuts)
   const threatContainer = document.getElementById('board-threats');
   threatContainer.innerHTML = '';
-  const threats = PokerEvaluator.analyzeBoardThreats(currentCommunity);
+  const threats = PokerEvaluator.analyzeBoardThreats(activeCommunityCards);
   
   threats.forEach(t => {
     const div = document.createElement('div');
@@ -52,12 +58,18 @@ function updateEvaluation() {
     threatContainer.appendChild(div);
   });
 
-  // 4. Tampilkan 5 Kartu Terbaik Anda
-  document.getElementById('result-name').innerText = myBest.rankName;
+  // 4. Kombinasi Terbaik Saat Ini (Langsung Update di Flop/Turn/River)
+  const resultNameEl = document.getElementById('result-name');
   const bestGroup = document.getElementById('best-cards');
   bestGroup.innerHTML = '';
-  if (myBest.cards && myBest.cards.length > 0) {
-    myBest.cards.forEach(c => bestGroup.appendChild(createCardUI(c, false)));
+
+  if (totalCards.length > 0) {
+    resultNameEl.innerText = myBest.rankName;
+    if (myBest.cards && myBest.cards.length > 0) {
+      myBest.cards.forEach(c => bestGroup.appendChild(createFilledCardUI(c, () => {})));
+    }
+  } else {
+    resultNameEl.innerText = "Masukkan Kartu Tangan / Komunitas";
   }
 }
 
@@ -68,89 +80,110 @@ function renderBoard() {
   handContainer.innerHTML = '';
   commContainer.innerHTML = '';
 
+  // Render Slot Kartu Tangan (2 Slot)
   currentHand.forEach((card, index) => {
-    const cardEl = createCardUI(card, true, () => {
-      currentHand.splice(index, 1);
-      renderBoard();
-    });
-    handContainer.appendChild(cardEl);
+    if (card) {
+      handContainer.appendChild(createFilledCardUI(card, () => {
+        currentHand[index] = null;
+        renderBoard();
+      }));
+    } else {
+      handContainer.appendChild(createPlaceholderUI(() => openPicker('hand', index)));
+    }
   });
 
+  // Render Slot Kartu Komunitas (5 Slot)
   currentCommunity.forEach((card, index) => {
-    const cardEl = createCardUI(card, true, () => {
-      currentCommunity.splice(index, 1);
-      renderBoard();
-    });
-    commContainer.appendChild(cardEl);
+    if (card) {
+      commContainer.appendChild(createFilledCardUI(card, () => {
+        currentCommunity[index] = null;
+        renderBoard();
+      }));
+    } else {
+      commContainer.appendChild(createPlaceholderUI(() => openPicker('community', index)));
+    }
   });
 
   updateEvaluation();
 }
 
+// Reset Hand & Community
 document.getElementById('btn-clear-hand').addEventListener('click', () => {
-  currentHand = [];
+  currentHand = [null, null];
   renderBoard();
 });
 
 document.getElementById('btn-clear-comm').addEventListener('click', () => {
-  currentCommunity = [];
+  currentCommunity = [null, null, null, null, null];
   renderBoard();
 });
 
-// Modal System Picker
+// Modal Picker (4 Baris)
 const modal = document.getElementById('card-picker-modal');
-const rankStep = document.getElementById('rank-step');
-const rankGrid = document.getElementById('rank-grid');
+const fullCardGrid = document.getElementById('full-card-grid');
 
-function openPicker(target) {
-  activeTarget = target;
-  selectedSuit = null;
-  document.getElementById('target-label').innerText = target === 'hand' ? 'Tangan' : 'Komunitas';
-  
-  document.querySelectorAll('.btn-suit').forEach(btn => btn.classList.remove('selected'));
-  rankStep.classList.add('hidden');
+function openPicker(type, index) {
+  activeTarget = { type, index };
+  document.getElementById('target-label').innerText = 
+    type === 'hand' ? `Tangan Slot #${index + 1}` : `Komunitas Slot #${index + 1}`;
+
+  renderFullCardGrid();
   modal.classList.remove('hidden');
 }
 
-document.querySelectorAll('.btn-suit').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.btn-suit').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    
-    selectedSuit = SUITS[btn.dataset.suit];
-    renderRankGrid();
-    rankStep.classList.remove('hidden');
-  });
-});
+function renderFullCardGrid() {
+  fullCardGrid.innerHTML = '';
 
-function renderRankGrid() {
-  rankGrid.innerHTML = '';
-  [...RANKS].reverse().forEach(rank => {
-    const btn = document.createElement('button');
-    btn.className = 'btn-rank';
-    btn.innerText = rank.label;
-    btn.addEventListener('click', () => addCard(rank, selectedSuit));
-    rankGrid.appendChild(btn);
+  const chosenCards = [...currentHand, ...currentCommunity].filter(c => c !== null);
+
+  Object.keys(SUITS).forEach(suitKey => {
+    const suit = SUITS[suitKey];
+    const row = document.createElement('div');
+    row.className = 'suit-row';
+
+    const label = document.createElement('div');
+    label.className = `suit-label ${suit.color}`;
+    label.innerText = suit.symbol;
+    row.appendChild(label);
+
+    const btnContainer = document.createElement('div');
+    btnContainer.className = 'rank-buttons';
+
+    [...RANKS].reverse().forEach(rank => {
+      const btn = document.createElement('button');
+      btn.className = `btn-card-select ${suit.color}`;
+      btn.innerText = rank.label;
+
+      const isUsed = chosenCards.some(c => c.rank.value === rank.value && c.suit.symbol === suit.symbol);
+      if (isUsed) {
+        btn.classList.add('disabled');
+        btn.disabled = true;
+      } else {
+        btn.addEventListener('click', () => selectCard(rank, suit));
+      }
+
+      btnContainer.appendChild(btn);
+    });
+
+    row.appendChild(btnContainer);
+    fullCardGrid.appendChild(row);
   });
 }
 
-function addCard(rank, suit) {
+function selectCard(rank, suit) {
   const newCard = new Card(rank, suit);
 
-  if (activeTarget === 'hand') {
-    if (currentHand.length >= 2) currentHand.shift();
-    currentHand.push(newCard);
+  if (activeTarget.type === 'hand') {
+    currentHand[activeTarget.index] = newCard;
   } else {
-    if (currentCommunity.length >= 5) currentCommunity.shift();
-    currentCommunity.push(newCard);
+    currentCommunity[activeTarget.index] = newCard;
   }
 
   modal.classList.add('hidden');
   renderBoard();
 }
 
-document.getElementById('btn-open-hand').addEventListener('click', () => openPicker('hand'));
-document.getElementById('btn-open-comm').addEventListener('click', () => openPicker('community'));
 document.getElementById('close-modal').addEventListener('click', () => modal.classList.add('hidden'));
 
+// Inisialisasi Tampilan Awal
 renderBoard();
