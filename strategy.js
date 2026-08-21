@@ -1,7 +1,6 @@
 import { PokerEvaluator } from './evaluator.js';
 
 export class PokerStrategy {
-  // Mengukur kekuatan pre-flop berdasarkan standar Chen Formula / Grouping Sklansky
   static getPreFlopTier(handCards) {
     if (handCards.length < 2) return 0;
 
@@ -15,22 +14,21 @@ export class PokerStrategy {
     if (isPair) {
       if (high >= 11) return 1; // Pocket Premium (AA, KK, QQ, JJ)
       if (high >= 8) return 2;  // Pocket Medium (1010, 99, 88)
-      return 3;                 // Pocket Small (77 down to 22)
+      return 3;                 // Pocket Small (77-22)
     }
 
-    if (high === 14) { // Memegang As
-      if (low >= 10) return isSuited ? 1 : 2; // AK, AQ, AJ, AT
-      if (isSuited) return 3;                // Axs (Suited Ace)
-      return 4;                              // Offsuit Ace biasa
+    if (high === 14) {
+      if (low >= 10) return isSuited ? 1 : 2;
+      if (isSuited) return 3;
+      return 4;
     }
 
-    if (high === 13 && low >= 10) return isSuited ? 2 : 3; // KQ, KJ, KT
-    if (isSuited && high - low === 1 && high >= 9) return 3; // Suited Connectors tinggi (J10s, 109s)
+    if (high === 13 && low >= 10) return isSuited ? 2 : 3;
+    if (isSuited && high - low === 1 && high >= 9) return 3;
 
-    return 4; // Trash / Marginal Hand
+    return 4;
   }
 
-  // Rekomendasi Betting untuk Setiap Fase Permainan
   static getBettingRecommendation(handCards, communityCards, bigBlind = 1200) {
     const activeHand = handCards.filter(c => c !== null);
     const activeCommunity = communityCards.filter(c => c !== null);
@@ -46,29 +44,29 @@ export class PokerStrategy {
       const tier = this.getPreFlopTier(activeHand);
 
       switch (tier) {
-        case 1: // Kartu Super Kuat (AA, KK, QQ, AKs)
+        case 1:
           return {
             action: "RAISE / RE-RAISE",
-            amount: bigBlind * 3, // 3.600
-            reason: "Kartu monster pre-flop. Lakukan raise 2.5x–3x Big Blind untuk membendung limper dan membangun pot."
+            amount: bigBlind * 3,
+            reason: "Kartu monster pre-flop. Lakukan raise 2.5x–3x Big Blind untuk membendung limper."
           };
-        case 2: // Kartu Bagus (JJ, TT, AQ, KQs)
+        case 2:
           return {
             action: "RAISE / CALL",
-            amount: Math.round(bigBlind * 2.5), // 3.000
-            reason: "Kartu kuat. Open raise jika belum ada aksi, atau Call jika lawan melakukan standard open raise."
+            amount: Math.round(bigBlind * 2.5),
+            reason: "Kartu kuat. Open raise jika belum ada aksi, atau Call jika ada open raise."
           };
-        case 3: // Kartu Spekulatif (Pair Kecil, Suited Connectors, Axs)
+        case 3:
           return {
             action: "CALL / LIMP",
-            amount: bigBlind, // 1.200
-            reason: "Kartu bernilai set-mine/draw. Masuk pot dengan biaya murah untuk melihat Flop."
+            amount: bigBlind,
+            reason: "Kartu bernilai set-mine/draw. Masuk pot dengan biaya murah."
           };
-        default: // Kartu Lemah / Sampah
+        default:
           return {
             action: "CHECK / FOLD",
             amount: 0,
-            reason: "Kartu pre-flop terlalu lemah. Fold jika ada raise dari lawan, atau Check jika di posisi Big Blind."
+            reason: "Kartu pre-flop terlalu lemah. Fold jika ada raise dari lawan."
           };
       }
     }
@@ -78,69 +76,81 @@ export class PokerStrategy {
     const bestHand = PokerEvaluator.getBestHand(totalCards);
     const equity = PokerEvaluator.calculateStrength(activeHand, activeCommunity);
     const threats = PokerEvaluator.analyzeBoardThreats(activeCommunity);
-    const hasDangerThreat = threats.some(t => !t.safe);
+    
+    // Perbaikan: Cek spesifik apakah ada ancaman Flush, Full House, atau Straight Nyata
+    const hasStraightThreat = threats.some(t => t.text.includes("Straight"));
+    const hasDangerThreat = threats.some(t => !t.safe) || hasStraightThreat;
 
     let phaseName = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
 
     // Kategori Kombinasi Kartu
-    const isMonster = bestHand.score >= 6; // Flush, Full House, 4-of-a-kind, Straight Flush
+    const isMonster = bestHand.score >= 6; // Flush, Full House, 4-of-a-kind
     const isStrong = bestHand.score >= 3;  // Two Pair, Three of a Kind, Straight
-    const isMedium = bestHand.score === 2;  // One Pair
 
     // A. Monster Hand
     if (isMonster) {
       return {
         action: "RAISE / BET",
-        amount: bigBlind * 4, // ~4.800 (Value Bet Besar)
-        reason: `[${phaseName}] Anda membuat ${bestHand.rankName}! Lakukan Value Bet besar atau Re-raise untuk memaksimalkan pot.`
+        amount: bigBlind * 4,
+        reason: `[${phaseName}] Anda membuat ${bestHand.rankName}! Lakukan Value Bet besar untuk memaksimalkan pot.`
       };
     }
 
-    // B. Strong Hand (Trips / Two Pair / Straight)
+    // B. Strong Hand (Three of a Kind / Two Pair / Straight)
     if (isStrong) {
+      // PERBAIKAN KHUSUS RIVER: Jika memegang Set/Trips tapi papan terkoneksi Straight
+      if (phaseName === "RIVER" && hasStraightThreat) {
+        return {
+          action: "CHECK / CALL",
+          amount: bigBlind,
+          reason: `[${phaseName}] Anda punya ${bestHand.rankName}, namun ada potensi Straight lawan (K+J) di meja. Sebaiknya Check / Call taruhan kecil saja.`
+        };
+      }
+
       if (hasDangerThreat && phaseName !== "FLOP") {
         return {
           action: "CHECK / CALL",
-          amount: bigBlind * 2,
-          reason: `[${phaseName}] Anda punya ${bestHand.rankName}, tetapi ada ancaman Flush/Full House di meja. Bermain aman dengan Check/Call.`
+          amount: bigBlind * 1.5,
+          reason: `[${phaseName}] Anda punya ${bestHand.rankName}, tetapi ada potensi Flush/Straight di meja. Bermain hati-hati dengan Check/Call.`
         };
       }
+
       return {
         action: "BET / RAISE",
-        amount: Math.round(bigBlind * 2.5), // ~3.000
-        reason: `[${phaseName}] ${bestHand.rankName} tergolong kuat. Lakukan Bet ukuran 1/2 s.d 2/3 Pot untuk mengekstrak value.`
+        amount: Math.round(bigBlind * 2.5),
+        reason: `[${phaseName}] ${bestHand.rankName} tergolong kuat. Lakukan Bet ukuran 1/2 s.d 2/3 Pot.`
       };
     }
 
     // C. Medium Hand (One Pair)
-    if (isMedium) {
+    if (bestHand.score === 2) {
       if (hasDangerThreat) {
         return {
           action: "CHECK / FOLD",
           amount: 0,
-          reason: `[${phaseName}] Hanya memegang One Pair dengan papan meja yang berbahaya. Lakukan Check, Fold jika lawan memasang bet tinggi.`
+          reason: `[${phaseName}] Hanya memegang One Pair dengan papan berbahaya. Check/Fold jika lawan memasang bet.`
         };
       }
       return {
         action: "CHECK / CALL",
-        amount: bigBlind, // Call seukuran 1 BB (1.200)
-        reason: `[${phaseName}] Memegang One Pair. Lebih aman Check/Call bet kecil untuk kontrol pot.`
+        amount: bigBlind,
+        reason: `[${phaseName}] Memegang One Pair. Lebih aman Check/Call bet kecil.`
       };
     }
 
-    // D. High Card / Drawing Hand (Tanpa Pair)
+    // D. High Card / Drawing
     if (equity >= 40 && commCount < 5) {
       return {
         action: "CHECK / CALL",
         amount: bigBlind,
-        reason: `[${phaseName}] Memiliki potensi Flush/Straight Draw. Coba ambil gratisan (Check) atau Call jika harganya murah.`
+        reason: `[${phaseName}] Memiliki potensi Flush/Straight Draw. Coba amati gratisan (Check) atau Call murah.`
       };
     }
 
     return {
       action: "CHECK / FOLD",
       amount: 0,
-      reason: `[${phaseName}] Tidak memiliki kombinasi/potensi berarti. Segera Check atau Fold jika menghadapi taruhan lawan.`
+      reason: `[${phaseName}] Tidak memiliki kombinasi berarti. Segera Check atau Fold.`
     };
   }
 }
