@@ -6,7 +6,6 @@ let currentCommunity = [];
 let activeTarget = null;
 let selectedSuit = null;
 
-// Fungsi Render Elemen Kartu (Bisa Diklik untuk Hapus)
 function createCardUI(card, isClickable = false, onDeleteCallback = null) {
   const cardDiv = document.createElement('div');
   cardDiv.className = `card ${card.suit.color} ${isClickable ? 'clickable' : ''}`;
@@ -26,7 +25,11 @@ function createCardUI(card, isClickable = false, onDeleteCallback = null) {
 function updateEvaluation() {
   const totalCards = [...currentHand, ...currentCommunity];
 
-  // 1. Evaluasi Tangan Sendiri + Win Equity
+  // 1. Kombinasi Kartu Tangan Murni
+  document.getElementById('hole-only-hand').innerText = 
+    PokerEvaluator.evaluateHoleCardsOnly(currentHand);
+
+  // 2. Evaluasi Tangan Sendiri + Board & Win Equity
   const myBest = PokerEvaluator.getBestHand(totalCards);
   document.getElementById('my-best-hand').innerText = myBest.rankName;
 
@@ -34,7 +37,7 @@ function updateEvaluation() {
   document.getElementById('strength-bar').style.width = `${percentage}%`;
   document.getElementById('strength-percent').innerText = `${percentage}%`;
 
-  // 2. Analisis Potensi Ancaman & Counter Kartu Terkuat (The Nuts)
+  // 3. Analisis Potensi Ancaman & Counter Kartu Terkuat (The Nuts)
   const threatContainer = document.getElementById('board-threats');
   threatContainer.innerHTML = '';
   const threats = PokerEvaluator.analyzeBoardThreats(currentCommunity);
@@ -49,7 +52,7 @@ function updateEvaluation() {
     threatContainer.appendChild(div);
   });
 
-  // 3. Tampilkan 5 Kartu Terbaik Anda
+  // 4. Tampilkan 5 Kartu Terbaik Anda
   document.getElementById('result-name').innerText = myBest.rankName;
   const bestGroup = document.getElementById('best-cards');
   bestGroup.innerHTML = '';
@@ -65,7 +68,6 @@ function renderBoard() {
   handContainer.innerHTML = '';
   commContainer.innerHTML = '';
 
-  // Render Kartu Tangan (Klik untuk hapus)
   currentHand.forEach((card, index) => {
     const cardEl = createCardUI(card, true, () => {
       currentHand.splice(index, 1);
@@ -74,7 +76,6 @@ function renderBoard() {
     handContainer.appendChild(cardEl);
   });
 
-  // Render Kartu Komunitas (Klik untuk hapus)
   currentCommunity.forEach((card, index) => {
     const cardEl = createCardUI(card, true, () => {
       currentCommunity.splice(index, 1);
@@ -86,7 +87,6 @@ function renderBoard() {
   updateEvaluation();
 }
 
-// Tombol Reset/Clear All
 document.getElementById('btn-clear-hand').addEventListener('click', () => {
   currentHand = [];
   renderBoard();
