@@ -9,30 +9,22 @@ export class PokerStrategy {
     const high = Math.max(c1.rank.value, c2.rank.value);
     const low = Math.min(c1.rank.value, c2.rank.value);
     const isPair = c1.rank.value === c2.rank.value;
-    
-    // Cek apakah simbol/lambang kartu sama (Suited)
     const isSuited = c1.suit.symbol === c2.suit.symbol;
 
-    // 1. Pocket Pairs (AA, KK, QQ, JJ, dst)
     if (isPair) {
-      if (high >= 11) return 1; // Tier 1: Premium Pairs (AA, KK, QQ, JJ)
-      if (high >= 8) return 2;  // Tier 2: Medium Pairs (1010, 99, 88)
-      return 3;                 // Tier 3: Small Pairs (77-22)
+      if (high >= 11) return 1; // Pocket Premium (AA, KK, QQ, JJ)
+      if (high >= 8) return 2;  // Pocket Medium (1010, 99, 88)
+      return 3;                 // Pocket Small (77-22)
     }
 
-    // 2. Kombinasi Kartu Tinggi (As & King)
-    if (high === 14) { // Kartu As
-      if (low === 13) return isSuited ? 1 : 2; // AK Suited = Tier 1, AK Offsuit = Tier 2
-      if (low >= 10) return isSuited ? 2 : 3;  // AQ/AJ Suited lebih kuat
-      if (isSuited) return 3;                  // A-2 s/d A-9 Suited punya potensi Nut Flush
+    if (high === 14) {
+      if (low === 13) return isSuited ? 1 : 2;
+      if (low >= 10) return isSuited ? 2 : 3;
+      if (isSuited) return 3;
       return 4;
     }
 
-    // 3. Suited Connectors (misal: J♣-10♣, 10♠-9♠)
-    if (isSuited && (high - low === 1) && high >= 8) {
-      return 2;
-    }
-
+    if (isSuited && (high - low === 1) && high >= 8) return 2;
     if (high === 13 && low >= 10) return isSuited ? 2 : 3;
 
     return 4;
@@ -48,7 +40,7 @@ export class PokerStrategy {
 
     const commCount = activeCommunity.length;
 
-    // === 1. FASE PRE-FLOP ===
+    // === 1. FASE PRE-FLOP (Kartu Komunitas Belum Terbuka) ===
     if (commCount === 0) {
       const tier = this.getPreFlopTier(activeHand);
 
@@ -57,25 +49,25 @@ export class PokerStrategy {
           return {
             action: "RAISE / RE-RAISE",
             amount: bigBlind * 3,
-            reason: "Kartu monster pre-flop. Potensi kuat membuat Set, Top Pair, atau Flush/Straight!"
+            reason: "Kartu monster pre-flop. Lakukan raise untuk mengontrol piringan taruhan."
           };
         case 2:
           return {
             action: "RAISE / CALL",
             amount: Math.round(bigBlind * 2.5),
-            reason: "Kartu kuat dengan fleksibilitas baik. Open raise atau Call raise lawan."
+            reason: "Kartu tangan kuat dengan potensi bagus. Lakukan open raise atau call."
           };
         case 3:
           return {
             action: "CALL / LIMP",
             amount: bigBlind,
-            reason: "Kartu bernilai 'Set-Mining' (mencari Set) atau 'Flush Draw'. Masuk pot murah."
+            reason: "Kartu berpotensi (Set-Mine / Flush Draw). Masuk pot dengan biaya murah."
           };
         default:
           return {
             action: "CHECK / FOLD",
             amount: 0,
-            reason: "Kartu pre-flop terlalu lemah. Fold jika lawan melakukan raise."
+            reason: "Kartu pre-flop lemah. Fold jika ada raise lawan."
           };
       }
     }
@@ -86,11 +78,10 @@ export class PokerStrategy {
     const equity = PokerEvaluator.calculateStrength(activeHand, activeCommunity);
     const threats = PokerEvaluator.analyzeBoardThreats(activeCommunity);
 
-    // Variabel Analisis Kartu
     const boardRanks = activeCommunity.map(c => c.rank.value);
     const maxBoardRank = boardRanks.length > 0 ? Math.max(...boardRanks) : 0;
 
-    // Deteksi Trips di Board (3 kartu kembar di meja)
+    // Cek Trips di Board (3 kartu kembar di meja)
     const commCounts = {};
     activeCommunity.forEach(c => commCounts[c.rank.value] = (commCounts[c.rank.value] || 0) + 1);
     const hasTripsOnBoard = Object.values(commCounts).some(count => count >= 3);
@@ -100,35 +91,33 @@ export class PokerStrategy {
 
     let phaseName = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
 
-    // Cek Karakteristik Pair
     const isPocketPair = activeHand[0].rank.value === activeHand[1].rank.value;
     const isOverpair = isPocketPair && activeHand[0].rank.value > maxBoardRank;
 
-    // A. MONSTER HAND (Full House, Four of a Kind, Flush, Straight Flush)
+    // A. MONSTER HAND (Full House, Quads, Flush, Straight Flush)
     if (bestHand.score >= 6) {
-      // Penjagaan khusus jika ada 3 kartu kembar di meja
       if (hasTripsOnBoard && bestHand.score === 7) {
         return {
           action: "CHECK / CALL",
           amount: bigBlind,
-          reason: `[${phaseName}] Anda memegang Full House, tetapi ada 3 kartu kembar di meja. Waspada lawan membuat Quads. Check/Call.`
+          reason: `[${phaseName}] Anda memegang Full House, tetapi ada 3 kartu kembar di meja. Waspada Quads lawan.`
         };
       }
 
       return {
         action: "RAISE / BET",
         amount: bigBlind * 4,
-        reason: `[${phaseName}] Kombinasi Monster (${bestHand.rankName})! Lakukan Value Bet besar.`
+        reason: `[${phaseName}] Kombinasi Terbentuk: ${bestHand.rankName}! Lakukan Value Bet besar.`
       };
     }
 
-    // B. STRONG HAND (Set / Three of a Kind, Two Pair, Straight, atau OVERPAIR)
+    // B. STRONG HAND (Set / Three of a Kind, Two Pair, Straight, Overpair)
     if (bestHand.score >= 3 || isOverpair) {
       if (phaseName === "RIVER" && hasStraightThreat) {
         return {
           action: "CHECK / CALL",
           amount: bigBlind,
-          reason: `[${phaseName}] Kombinasi Anda kuat (${isOverpair ? 'Overpair' : bestHand.rankName}), tetapi ada potensi Straight di meja. Check/Call.`
+          reason: `[${phaseName}] Kombinasi ${isOverpair ? 'Overpair' : bestHand.rankName} kuat, namun ada ancaman Straight lawan di meja.`
         };
       }
 
@@ -136,56 +125,83 @@ export class PokerStrategy {
         return {
           action: "CHECK / CALL",
           amount: bigBlind * 1.5,
-          reason: `[${phaseName}] Kombinasi kuat, namun ada ancaman Flush/Straight di meja. Bermain aman.`
+          reason: `[${phaseName}] Kombinasi kuat, namun ada ancaman Flush/Straight di meja. Main aman.`
         };
       }
 
-      let reasonText = `[${phaseName}] `;
+      let textReason = `[${phaseName}] `;
       if (isOverpair) {
-        reasonText += `Overpair Sangat Kuat! Pair tangan Anda mendominasi Pair di meja lawan. Lakukan Value Bet!`;
-      } else if (bestHand.score === 4) { // Three of a Kind / Set
-        reasonText += `Berhasil membuat Set/Three of a Kind! Peluang menang sangat tinggi. Bet / Raise!`;
+        textReason += `Overpair Sangat Kuat! Pair tangan Anda mendominasi kartu tertinggi di meja. Lakukan Value Bet!`;
       } else {
-        reasonText += `${bestHand.rankName} tergolong kuat. Lakukan Bet / Raise untuk mengambil pot.`;
+        textReason += `Kombinasi Terbentuk: ${bestHand.rankName}. Lakukan Bet / Raise untuk mengambil pot!`;
       }
 
       return {
         action: "BET / RAISE",
         amount: Math.round(bigBlind * 2.5),
-        reason: reasonText
+        reason: textReason
       };
     }
 
-    // C. MEDIUM HAND (One Pair / Top Pair)
+    // C. ANALISIS POTENSI DRAW (Mencari Kartu Tambahan di Flop & Turn)
+    if (commCount < 5) {
+      // 1. Deteksi Flush Draw
+      const suitCounts = {};
+      totalCards.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
+      const flushSuitSymbol = Object.keys(suitCounts).find(s => suitCounts[s] === 4);
+
+      // 2. Deteksi Straight Draw
+      const uniqueRanks = [...new Set(totalCards.map(c => c.rank.value))].sort((a,b) => a - b);
+      let isStraightDraw = false;
+      
+      for (let i = 0; i < uniqueRanks.length - 3; i++) {
+        if (uniqueRanks[i+3] - uniqueRanks[i] <= 4) {
+          isStraightDraw = true;
+          break;
+        }
+      }
+
+      if (flushSuitSymbol) {
+        const suitNames = { '♣': 'Keriting', '♠': 'Sekop', '♥': 'Hati', '♦': 'Diamond' };
+        const name = suitNames[flushSuitSymbol] || flushSuitSymbol;
+        return {
+          action: "CHECK / CALL",
+          amount: bigBlind,
+          reason: `[${phaseName}] FLUSH DRAW! Terkumpul 4 kartu ${name} (${flushSuitSymbol}). Butuh 1 kartu simbol ${name} lagi di meja untuk membuat Flush.`
+        };
+      }
+
+      if (isStraightDraw) {
+        return {
+          action: "CHECK / CALL",
+          amount: bigBlind,
+          reason: `[${phaseName}] STRAIGHT DRAW! Terbentuk 4 urutan angka. Butuh 1 kartu penyambung urutan (simbol bebas) untuk membuat Straight.`
+        };
+      }
+    }
+
+    // D. MEDIUM HAND (One Pair Biasa)
     if (bestHand.score === 2) {
       if (hasDangerThreat) {
         return {
           action: "CHECK / FOLD",
           amount: 0,
-          reason: `[${phaseName}] Hanya memegang One Pair di papan yang berbahaya. Check/Fold jika lawan bertaruh.`
+          reason: `[${phaseName}] Hanya memegang One Pair di papan rawan. Disarankan Check/Fold.`
         };
       }
 
       return {
         action: "CHECK / CALL",
         amount: bigBlind,
-        reason: `[${phaseName}] Memegang One Pair. Pasang taruhan kecil atau Check/Call.`
+        reason: `[${phaseName}] Kombinasi saat ini: One Pair. Lakukan Check atau Call murah.`
       };
     }
 
-    // D. DRAWING HAND (Potensi Set/Flush/Straight yang belum jadi)
-    if (equity >= 40 && commCount < 5) {
-      return {
-        action: "CHECK / CALL",
-        amount: bigBlind,
-        reason: `[${phaseName}] Memiliki potensi berkembang (Draw) yang bagus. Amati kartu berikutnya secara murah.`
-      };
-    }
-
+    // E. HIGH CARD / DRAW GAGAL
     return {
       action: "CHECK / FOLD",
       amount: 0,
-      reason: `[${phaseName}] Kombinasi kartu lemah. Segera Check atau Fold.`
+      reason: `[${phaseName}] Tidak ada kombinasi atau potensi draw berarti. Segera Check atau Fold.`
     };
   }
 }
