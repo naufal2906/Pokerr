@@ -1,76 +1,191 @@
+:root {
+  --bg-color: #0b0f19;
+  --card-bg: rgba(22, 27, 38, 0.85);
+  --accent-color: #00f0ff;
+  --text-color: #ffffff;
+}
+
 body {
-  font-family: Arial, sans-serif;
-  background-color: #1b4332;
-  color: #ffffff;
-  display: flex;
-  justify-content: center;
-  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
   margin: 0;
-}
-
-.container {
-  text-align: center;
-  max-width: 800px;
-  width: 100%;
-}
-
-.board {
+  padding: 20px 10px;
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 20px;
+  align-items: center;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Outer RGB Glowing Border Effect */
+.rgb-card-container {
+  position: relative;
+  border-radius: 16px;
+  padding: 3px;
+  background: linear-gradient(60deg, #f700ff, #0011ff, #00ff66, #ff0000, #f700ff);
+  background-size: 300% 300%;
+  animation: rgbGlow 6s ease infinite;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.3);
+}
+
+@keyframes rgbGlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.main-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  padding: 25px 15px;
+  text-align: center;
+}
+
+.glow-title {
+  margin-top: 0;
+  font-size: 1.8rem;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 0 10px var(--accent-color);
+}
+
+.symbols {
+  color: #ff0055;
+}
+
+.section {
   margin-bottom: 20px;
+}
+
+h2 {
+  font-size: 1.1rem;
+  color: #a0aec0;
+  margin-bottom: 10px;
 }
 
 .card-group {
   display: flex;
   justify-content: center;
   gap: 10px;
-  min-height: 90px;
+  flex-wrap: wrap;
+  min-height: 85px;
 }
 
+/* Style Kartu Poker Modern */
 .card {
-  width: 60px;
-  height: 85px;
-  background: white;
-  border-radius: 6px;
+  width: 58px;
+  height: 82px;
+  background: #ffffff;
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  font-size: 1.2rem;
+  justify-content: space-between;
+  padding: 6px;
   font-weight: bold;
-  box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s, box-shadow 0.2s;
+  user-select: none;
+  box-sizing: border-box;
 }
 
-.card.red { color: #d90429; }
-.card.black { color: #212529; }
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0 15px var(--accent-color);
+}
 
-button {
+.card.red { color: #e63946; }
+.card.black { color: #1d3557; }
+
+.sub-result {
+  margin-top: 8px;
+  font-size: 0.95rem;
+  color: #cbd5e1;
+}
+
+.highlight {
+  color: #00f0ff;
+  font-weight: bold;
+}
+
+.btn-rgb {
+  background: linear-gradient(45deg, #7928ca, #ff0080);
+  color: white;
+  border: none;
   padding: 12px 24px;
   font-size: 1rem;
   font-weight: bold;
-  background-color: #d8f3dc;
-  color: #1b4332;
-  border: none;
-  border-radius: 5px;
+  border-radius: 25px;
   cursor: pointer;
+  box-shadow: 0 0 15px rgba(255, 0, 128, 0.4);
+  transition: all 0.3s ease;
 }
 
-button:hover {
-  background-color: #b7e4c7;
+.btn-rgb:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 25px rgba(255, 0, 128, 0.8);
 }
 
 .result-box {
-  margin-top: 30px;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
+  margin-top: 25px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-#result-name {
+.glow-text {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #ffb703;
-  margin-bottom: 10px;
+  color: #ffbe0b;
+  text-shadow: 0 0 8px #ffbe0b;
+  margin-bottom: 12px;
+}
+
+/* Modal Picker Kartu */
+.modal {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99;
+}
+
+.modal.hidden { display: none; }
+
+.modal-content {
+  background: #161b26;
+  border: 1px solid var(--accent-color);
+  padding: 20px;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.close-btn {
+  font-size: 1.8rem;
+  cursor: pointer;
+  color: #ff0055;
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  gap: 8px;
 }
