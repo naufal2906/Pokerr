@@ -67,19 +67,24 @@ export class PokerEvaluator {
   }
 
   static getBestHand(cards) {
+    if (cards.length === 0) return { rankName: '-', cards: [] };
+
+    // Jika jumlah kartu kurang dari 5 (Flop tanpa kartu tangan, atau hanya kartu tangan saja)
     if (cards.length < 5) {
-      if (cards.length === 0) return { rankName: '-', cards: [] };
+      const sorted = [...cards].sort((a, b) => b.rank.value - a.rank.value);
       const counts = {};
-      cards.forEach(c => counts[c.rank.label] = (counts[c.rank.label] || 0) + 1);
+      sorted.forEach(c => counts[c.rank.label] = (counts[c.rank.label] || 0) + 1);
+
       const pairs = Object.entries(counts).filter(([_, count]) => count === 2);
       const trips = Object.entries(counts).filter(([_, count]) => count === 3);
 
-      if (trips.length > 0) return { rankName: `Three of a Kind (${trips[0][0]})`, cards };
-      if (pairs.length === 2) return { rankName: `Two Pair (${pairs[0][0]} & ${pairs[1][0]})`, cards };
-      if (pairs.length === 1) return { rankName: `One Pair (${pairs[0][0]})`, cards };
-      return { rankName: 'High Card', cards };
+      if (trips.length > 0) return { rankName: `Three of a Kind (${trips[0][0]})`, cards: sorted };
+      if (pairs.length === 2) return { rankName: `Two Pair (${pairs[0][0]} & ${pairs[1][0]})`, cards: sorted };
+      if (pairs.length === 1) return { rankName: `One Pair (${pairs[0][0]})`, cards: sorted };
+      return { rankName: `High Card (${sorted[0].rank.label})`, cards: sorted };
     }
 
+    // Jika kartu 5, 6, atau 7 (Langsung evaluasi dinamik tanpa nunggu 5 kartu komunitas)
     const combinations = this.getCombinations(cards, 5);
     let bestHand = null;
 
@@ -92,7 +97,7 @@ export class PokerEvaluator {
     return bestHand;
   }
 
-  // Analisis Potensi & Counter Kartu Terkuat (Spesifik dengan Contoh Kartu)
+  // Analisis Potensi & Counter Kartu Terkuat (The Nuts)
   static analyzeBoardThreats(communityCards) {
     if (communityCards.length < 3) {
       return [{ text: "Masukkan minimal 3 Kartu Komunitas untuk menganalisis potensi.", safe: true, nutText: "" }];
@@ -148,7 +153,7 @@ export class PokerEvaluator {
       }
     }
 
-    // 3. Analisis Pair / Full House / Four of a Kind di Meja dengan Contoh Kartu Murni
+    // 3. Analisis Pair / Full House / Four of a Kind di Meja
     const rankCounts = {};
     communityCards.forEach(c => rankCounts[c.rank.label] = (rankCounts[c.rank.label] || 0) + 1);
     
@@ -158,7 +163,6 @@ export class PokerEvaluator {
       if (cnt === 3) trips.push(label);
     });
 
-    // Urutkan dari peringkat kartu tertinggi
     const rankOrder = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
     const sortedPairs = pairs.sort((a, b) => rankOrder.indexOf(a) - rankOrder.indexOf(b));
 
