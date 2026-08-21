@@ -3,6 +3,8 @@ import { PokerEvaluator } from './evaluator.js';
 
 let currentHand = [];
 let currentCommunity = [];
+let activeTarget = null;
+let selectedSuit = null;
 
 function createCardUI(card) {
   const cardDiv = document.createElement('div');
@@ -15,24 +17,34 @@ function createCardUI(card) {
 }
 
 function updateEvaluation() {
-  // 1. Evaluasi Tangan
-  document.getElementById('hand-only-result').innerText = 
-    PokerEvaluator.evaluateHoleCards(currentHand);
+  const totalCards = [...currentHand, ...currentCommunity];
 
-  // 2. Persentase Kekuatan Kartu
+  // 1. Kombinasi Kartu Saat Ini & Persentase Kekuatan Tangan
+  document.getElementById('current-hand-made').innerText = 
+    PokerEvaluator.evaluateMadeHand(totalCards);
+
   const percentage = PokerEvaluator.calculateStrength(currentHand, currentCommunity);
   document.getElementById('strength-bar').style.width = `${percentage}%`;
   document.getElementById('strength-percent').innerText = `${percentage}%`;
 
-  // 3. Kombinasi Tertinggi Meja
-  const totalCards = [...currentHand, ...currentCommunity];
-  const bestResult = PokerEvaluator.getBestHand(totalCards);
+  // 2. Daftar Potensi / Perkiraan Kombinasi
+  const potentialContainer = document.getElementById('potential-draws');
+  potentialContainer.innerHTML = '';
+  const potentials = PokerEvaluator.detectPotentialDraws(currentHand, currentCommunity);
+  potentials.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'potential-item';
+    div.innerText = item;
+    potentialContainer.appendChild(div);
+  });
 
+  // 3. Kombinasi Terbaik Saat Ini (5 Kartu)
+  const bestResult = PokerEvaluator.getBestHand(totalCards);
   document.getElementById('result-name').innerText = bestResult.rankName;
   
   const bestGroup = document.getElementById('best-cards');
   bestGroup.innerHTML = '';
-  if (bestResult.cards && bestResult.cards.length > 0) {
+  if (bestResult.cards && bestResult.cards.length === 5) {
     bestResult.cards.forEach(c => bestGroup.appendChild(createCardUI(c)));
   }
 }
@@ -50,33 +62,60 @@ function renderBoard() {
   updateEvaluation();
 }
 
-// Handler Tambah Kartu Tangan Inline
-document.getElementById('btn-add-hand').addEventListener('click', () => {
-  if (currentHand.length >= 2) return alert('Kartu tangan maksimal 2!');
-  const rankVal = Number(document.getElementById('hand-rank-select').value);
-  const suitKey = document.getElementById('hand-suit-select').value;
+// System Modal 2 Langkah (Simbol -> Nilai)
+const modal = document.getElementById('card-picker-modal');
+const rankStep = document.getElementById('rank-step');
+const rankGrid = document.getElementById('rank-grid');
 
-  if (!rankVal || !suitKey) return alert('Pilih Nilai dan Simbol terlebih dahulu!');
+function openPicker(target) {
+  activeTarget = target;
+  selectedSuit = null;
+  document.getElementById('target-label').innerText = target === 'hand' ? 'Tangan' : 'Komunitas';
+  
+  document.querySelectorAll('.btn-suit').forEach(btn => btn.classList.remove('selected'));
+  rankStep.classList.add('hidden');
+  modal.classList.remove('hidden');
+}
 
-  const rank = RANKS.find(r => r.value === rankVal);
-  const suit = SUITS[suitKey];
-  currentHand.push(new Card(rank, suit));
-  renderBoard();
+document.querySelectorAll('.btn-suit').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.btn-suit').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    
+    selectedSuit = SUITS[btn.dataset.suit];
+    renderRankGrid();
+    rankStep.classList.remove('hidden');
+  });
 });
 
-// Handler Tambah Kartu Komunitas Inline
-document.getElementById('btn-add-community').addEventListener('click', () => {
-  if (currentCommunity.length >= 5) return alert('Kartu komunitas maksimal 5!');
-  const rankVal = Number(document.getElementById('comm-rank-select').value);
-  const suitKey = document.getElementById('comm-suit-select').value;
+function renderRankGrid() {
+  rankGrid.innerHTML = '';
+  [...RANKS].reverse().forEach(rank => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-rank';
+    btn.innerText = rank.label;
+    btn.addEventListener('click', () => addCard(rank, selectedSuit));
+    rankGrid.appendChild(btn);
+  });
+}
 
-  if (!rankVal || !suitKey) return alert('Pilih Nilai dan Simbol terlebih dahulu!');
+function addCard(rank, suit) {
+  const newCard = new Card(rank, suit);
 
-  const rank = RANKS.find(r => r.value === rankVal);
-  const suit = SUITS[suitKey];
-  currentCommunity.push(new Card(rank, suit));
+  if (activeTarget === 'hand') {
+    if (currentHand.length >= 2) currentHand.shift();
+    currentHand.push(newCard);
+  } else {
+    if (currentCommunity.length >= 5) currentCommunity.shift();
+    currentCommunity.push(newCard);
+  }
+
+  modal.classList.add('hidden');
   renderBoard();
-});
+}
 
-// Inisialisasi awal
+document.getElementById('btn-open-hand').addEventListener('click', () => openPicker('hand'));
+document.getElementById('btn-open-comm').addEventListener('click', () => openPicker('community'));
+document.getElementById('close-modal').addEventListener('click', () => modal.classList.add('hidden'));
+
 renderBoard();
