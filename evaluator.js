@@ -9,9 +9,10 @@ export class PokerEvaluator {
     return [...withHead, ...withoutHead];
   }
 
-  // Evaluasi khusus 2 kartu di tangan
+  // Evaluasi 2 Kartu di Tangan
   static evaluateHoleCards(cards) {
-    if (cards.length < 2) return "Pilih 2 Kartu";
+    if (cards.length === 0) return "-";
+    if (cards.length === 1) return `High Card (${cards[0].rank.label})`;
     if (cards[0].rank.value === cards[1].rank.value) {
       return `One Pair (${cards[0].rank.label})`;
     }
@@ -19,6 +20,7 @@ export class PokerEvaluator {
     return `High Card (${high.rank.label})`;
   }
 
+  // Evaluasi dasar 5 kartu
   static evaluate5CardHand(cards) {
     const sorted = [...cards].sort((a, b) => b.rank.value - a.rank.value);
     const isFlush = sorted.every(c => c.suit.symbol === sorted[0].suit.symbol);
@@ -56,9 +58,31 @@ export class PokerEvaluator {
     return { rankName: 'High Card', score: 1, cards: sorted };
   }
 
+  // Evaluasi fleksibel untuk 3 hingga 5 Kartu Komunitas
+  static evaluatePartialCards(cards) {
+    if (cards.length < 3) return "Minimal 3 Kartu Komunitas";
+    if (cards.length === 5) return this.evaluate5CardHand(cards).rankName;
+
+    // Untuk 3 atau 4 kartu komunitas
+    const sorted = [...cards].sort((a, b) => b.rank.value - a.rank.value);
+    const counts = {};
+    sorted.forEach(c => counts[c.rank.value] = (counts[c.rank.value] || 0) + 1);
+    const freq = Object.entries(counts)
+      .map(([val, count]) => ({ val: Number(val), count }))
+      .sort((a, b) => b.count - a.count || b.val - a.val);
+
+    if (freq[0].count === 4) return 'Four of a Kind';
+    if (freq[0].count === 3 && freq[1]?.count === 2) return 'Full House';
+    if (freq[0].count === 3) return 'Three of a Kind';
+    if (freq[0].count === 2 && freq[1]?.count === 2) return 'Two Pair';
+    if (freq[0].count === 2) return 'One Pair';
+    return `High Card (${sorted[0].rank.label})`;
+  }
+
+  // Evaluasi Kombinasi Tertinggi (Total 5 - 7 Kartu)
   static getBestHand(allCards) {
     if (allCards.length < 5) {
-      return { rankName: 'Minimal 5 Kartu Aktif', cards: allCards };
+      return { rankName: 'Minimal 5 Kartu di Meja', cards: [] };
     }
     const combinations = this.getCombinations(allCards, 5);
     let bestHand = null;
