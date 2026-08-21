@@ -73,26 +73,26 @@ function updateEvaluation() {
     resultNameEl.innerText = "Masukkan Kartu Tangan / Komunitas";
   }
 
-  // 5. Pembaharuan Saran Betting Strategi (Disesuaikan dengan strategy.js)
-  const strat = PokerStrategy.getRecommendation(currentHand, currentCommunity, null, 1200);
+  // 5. Pembaharuan Saran Betting Strategi (Blind 300 / 600)
+  const strat = PokerStrategy.getRecommendation(currentHand, currentCommunity, null, 600, 600);
   
   const actionEl = document.getElementById('strat-action');
   actionEl.innerText = strat.action;
   
-  // Penyesuaian Warna Border berdasarkan aksi
+  // Penyesuaian Warna Border
   if (strat.color === 'danger' || strat.action.includes('RAISE') || strat.action.includes('ALL-IN')) {
-    actionEl.style.borderColor = '#00ff66'; // Hijau Terang
+    actionEl.style.borderColor = '#00ff66';
   } else if (strat.color === 'warning' || strat.action.includes('WARNING')) {
-    actionEl.style.borderColor = '#ffbe0b'; // Kuning / Peringatan
+    actionEl.style.borderColor = '#ffbe0b';
   } else if (strat.action.includes('CALL') || strat.action.includes('BET')) {
-    actionEl.style.borderColor = '#00b4d8'; // Biru Muda
+    actionEl.style.borderColor = '#00b4d8';
   } else {
-    actionEl.style.borderColor = '#ff0055'; // Merah / Fold / Wait
+    actionEl.style.borderColor = '#ff0055';
   }
   
   actionEl.style.color = actionEl.style.borderColor;
 
-  // Menampilkan Nominal Taruhan dan Teks Penjelasan Strategi
+  // Output Nominal Taruhan & Teks Alasan Strategi
   document.getElementById('strat-amount').innerText = strat.size || '0 Chips';
   document.getElementById('strat-reason').innerText = strat.text || 'Masukkan kartu untuk mendapatkan saran strategi.';
 }
