@@ -1,5 +1,6 @@
 import { Card, RANKS, SUITS } from './card.js';
 import { PokerEvaluator } from './evaluator.js';
+import { PokerStrategy } from './strategy.js';
 
 let currentHand = [null, null]; // Slot 2 Kartu Tangan
 let currentCommunity = [null, null, null, null, null]; // Slot 5 Kartu Komunitas
@@ -71,6 +72,18 @@ function updateEvaluation() {
   } else {
     resultNameEl.innerText = "Masukkan Kartu Tangan / Komunitas";
   }
+
+  // 5. Pembaharuan Saran Betting Strategi (Blind 600 / 1200)
+  const strat = PokerStrategy.getBettingRecommendation(currentHand, currentCommunity, 1200);
+  
+  const actionEl = document.getElementById('strat-action');
+  actionEl.innerText = strat.action;
+  actionEl.style.borderColor = strat.action.includes('RAISE') || strat.action.includes('BET') ? '#00ff66' : 
+                               strat.action.includes('CALL') ? '#ffbe0b' : '#ff0055';
+  actionEl.style.color = actionEl.style.borderColor;
+
+  document.getElementById('strat-amount').innerText = strat.amount > 0 ? `${strat.amount.toLocaleString('id-ID')} Chips` : '0 Chips / Free';
+  document.getElementById('strat-reason').innerText = strat.reason;
 }
 
 function renderBoard() {
