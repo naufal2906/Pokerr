@@ -6,13 +6,20 @@ let currentCommunity = [];
 let activeTarget = null;
 let selectedSuit = null;
 
-function createCardUI(card) {
+// Fungsi Render Elemen Kartu (Bisa Diklik untuk Hapus)
+function createCardUI(card, isClickable = false, onDeleteCallback = null) {
   const cardDiv = document.createElement('div');
-  cardDiv.className = `card ${card.suit.color}`;
+  cardDiv.className = `card ${card.suit.color} ${isClickable ? 'clickable' : ''}`;
   cardDiv.innerHTML = `
     <div>${card.rank.label}</div>
     <div style="text-align: center;">${card.suit.symbol}</div>
   `;
+
+  if (isClickable && onDeleteCallback) {
+    cardDiv.title = "Klik untuk menghapus kartu ini";
+    cardDiv.addEventListener('click', onDeleteCallback);
+  }
+
   return cardDiv;
 }
 
@@ -27,27 +34,27 @@ function updateEvaluation() {
   document.getElementById('strength-bar').style.width = `${percentage}%`;
   document.getElementById('strength-percent').innerText = `${percentage}%`;
 
-  // 2. Evaluasi Murni Kartu Komunitas (Board Only)
-  document.getElementById('board-only-hand').innerText = 
-    PokerEvaluator.evaluateBoardOnly(currentCommunity);
-
-  // 3. Analisis Potensi Ancaman Meja (Board Threat)
+  // 2. Analisis Potensi Ancaman & Counter Kartu Terkuat (The Nuts)
   const threatContainer = document.getElementById('board-threats');
   threatContainer.innerHTML = '';
   const threats = PokerEvaluator.analyzeBoardThreats(currentCommunity);
+  
   threats.forEach(t => {
     const div = document.createElement('div');
     div.className = `potential-item ${t.safe ? 'safe' : ''}`;
-    div.innerText = t.text;
+    div.innerHTML = `
+      <div>${t.text}</div>
+      ${t.nutText ? `<span class="nut-card">${t.nutText}</span>` : ''}
+    `;
     threatContainer.appendChild(div);
   });
 
-  // 4. Tampilkan 5 Kartu Terbaik Anda
+  // 3. Tampilkan 5 Kartu Terbaik Anda
   document.getElementById('result-name').innerText = myBest.rankName;
   const bestGroup = document.getElementById('best-cards');
   bestGroup.innerHTML = '';
   if (myBest.cards && myBest.cards.length > 0) {
-    myBest.cards.forEach(c => bestGroup.appendChild(createCardUI(c)));
+    myBest.cards.forEach(c => bestGroup.appendChild(createCardUI(c, false)));
   }
 }
 
@@ -58,11 +65,37 @@ function renderBoard() {
   handContainer.innerHTML = '';
   commContainer.innerHTML = '';
 
-  currentHand.forEach(card => handContainer.appendChild(createCardUI(card)));
-  currentCommunity.forEach(card => commContainer.appendChild(createCardUI(card)));
+  // Render Kartu Tangan (Klik untuk hapus)
+  currentHand.forEach((card, index) => {
+    const cardEl = createCardUI(card, true, () => {
+      currentHand.splice(index, 1);
+      renderBoard();
+    });
+    handContainer.appendChild(cardEl);
+  });
+
+  // Render Kartu Komunitas (Klik untuk hapus)
+  currentCommunity.forEach((card, index) => {
+    const cardEl = createCardUI(card, true, () => {
+      currentCommunity.splice(index, 1);
+      renderBoard();
+    });
+    commContainer.appendChild(cardEl);
+  });
 
   updateEvaluation();
 }
+
+// Tombol Reset/Clear All
+document.getElementById('btn-clear-hand').addEventListener('click', () => {
+  currentHand = [];
+  renderBoard();
+});
+
+document.getElementById('btn-clear-comm').addEventListener('click', () => {
+  currentCommunity = [];
+  renderBoard();
+});
 
 // Modal System Picker
 const modal = document.getElementById('card-picker-modal');
