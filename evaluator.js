@@ -52,7 +52,7 @@ export class PokerEvaluator {
     });
     const maxSuitCount = Math.max(...Object.values(suitCounts), 0);
 
-    // 1. ANCAMAN PAIR DI MEJA (Three of a Kind / Full House / Quads)
+    // 1. ANCAMAN PAIR DI MEJA
     if (hasBoardPair) {
       const pairedLabel = pairedRanks.map(r => r === 14 ? 'As' : r === 13 ? 'King' : r === 12 ? 'Queen' : r === 11 ? 'Jack' : r).join(', ');
       threats.push({
@@ -71,7 +71,7 @@ export class PokerEvaluator {
       });
     }
 
-    // 3. ANCAMAN OVERCARDS / KARTU TINGGI (Jika tidak ada pair)
+    // 3. ANCAMAN OVERCARDS / KARTU TINGGI
     if (!hasBoardPair && ranks[0] >= 12 && maxSuitCount < 3) {
       const highLabel = ranks[0] === 14 ? 'As' : ranks[0] === 13 ? 'King' : 'Queen';
       threats.push({
@@ -90,6 +90,37 @@ export class PokerEvaluator {
     }
 
     return threats;
+  }
+
+  // HELPER MENGHITUNG KOMBINASI STRAIGHT
+  static checkStraight(uniqueRanks, validCards) {
+    let ranks = [...uniqueRanks];
+    if (ranks.includes(14)) {
+      ranks.push(1); // As bernilai 1 untuk Straight rendah (A-2-3-4-5)
+    }
+
+    for (let i = 0; i <= ranks.length - 5; i++) {
+      let sub = ranks.slice(i, i + 5);
+      let isConsecutive = true;
+      for (let j = 0; j < 4; j++) {
+        if (sub[j] - sub[j + 1] !== 1) {
+          isConsecutive = false;
+          break;
+        }
+      }
+      if (isConsecutive) {
+        let straightCards = [];
+        let targetRanks = sub[4] === 1 ? [14, 5, 4, 3, 2] : sub;
+        
+        targetRanks.forEach(r => {
+          const found = validCards.find(c => c.rank.value === r && !straightCards.includes(c));
+          if (found) straightCards.push(found);
+        });
+
+        return straightCards.slice(0, 5);
+      }
+    }
+    return null;
   }
 
   // EVALUASI HAND TERBAIK (5 KARTU)
@@ -117,31 +148,47 @@ export class PokerEvaluator {
       if (suitCounts[s] >= 5) flushSuit = s;
     });
 
+    const quads = uniqueRanks.filter(r => rankCounts[r] === 4);
     const trips = uniqueRanks.filter(r => rankCounts[r] === 3);
     const pairs = uniqueRanks.filter(r => rankCounts[r] === 2);
 
+    // 1. Four of a Kind (Quads)
+    if (quads.length > 0) {
+      return { score: 8, rankName: "Four of a Kind", cards: sortedCards.slice(0, 5), draws: [] };
+    }
+
+    // 2. Full House
     if (trips.length > 0 && (trips.length >= 2 || pairs.length >= 1)) {
       return { score: 7, rankName: "Full House", cards: sortedCards.slice(0, 5), draws: [] };
     }
 
+    // 3. Flush
     if (flushSuit) {
       const flushCards = sortedCards.filter(c => (c.suit.symbol || c.suit) === flushSuit);
       return { score: 6, rankName: "Flush", cards: flushCards.slice(0, 5), draws: [] };
     }
 
+    // 4. Straight
+    const straightCards = this.checkStraight(uniqueRanks, sortedCards);
+    if (straightCards) {
+      return { score: 5, rankName: "Straight", cards: straightCards, draws: [] };
+    }
+
+    // 5. Three of a Kind
     if (trips.length > 0) {
       return { score: 4, rankName: "Three of a Kind", cards: sortedCards.slice(0, 5), draws: [] };
     }
 
+    // 6. Two Pair
     if (pairs.length >= 2) {
       const draws = [];
-      // HANYA tampilkan teks butuh kartu jika babak BELUM River (< 5 kartu meja)
       if (activeComm.length > 0 && activeComm.length < 5) {
         draws.push({ text: "Full House", needed: "Butuh Kartu Penguat di Turn/River" });
       }
       return { score: 3, rankName: "Two Pair", cards: sortedCards.slice(0, 5), draws };
     }
 
+    // 7. One Pair
     if (pairs.length === 1) {
       const draws = [];
       if (activeComm.length > 0 && activeComm.length < 5) {
@@ -150,6 +197,7 @@ export class PokerEvaluator {
       return { score: 2, rankName: "One Pair", cards: sortedCards.slice(0, 5), draws };
     }
 
+    // 8. High Card
     return { score: 1, rankName: "High Card", cards: sortedCards.slice(0, 5), draws: [] };
   }
 
@@ -181,7 +229,8 @@ export class PokerEvaluator {
     const total = [...validHand, ...this.getValidCards(communityCards)];
     const best = this.getBestHand(total);
 
-    if (best.score >= 7) return 95;
+    if (best.score >= 8) return 98;
+    if (best.score === 7) return 95;
     if (best.score === 6) return 88;
     if (best.score === 5) return 80;
     if (best.score === 4) return 72;
