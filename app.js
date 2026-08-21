@@ -36,7 +36,7 @@ function updateEvaluation() {
   document.getElementById('hole-only-hand').innerText = 
     PokerEvaluator.evaluateHoleCardsOnly(activeHandCards);
 
-  // 2. Evaluasi Tangan + Meja & Win Equity
+  // 2. Evaluasi Tangan + Meja / Kartu Komunitas Murni
   const myBest = PokerEvaluator.getBestHand(totalCards);
   document.getElementById('my-best-hand').innerText = myBest.rankName;
 
@@ -59,7 +59,7 @@ function updateEvaluation() {
     threatContainer.appendChild(div);
   });
 
-  // 4. Kombinasi Terbaik Saat Ini (Langsung Update di Flop/Turn/River)
+  // 4. Kombinasi Terbaik Saat Ini
   const resultNameEl = document.getElementById('result-name');
   const bestGroup = document.getElementById('best-cards');
   bestGroup.innerHTML = '';
