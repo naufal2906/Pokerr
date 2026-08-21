@@ -1,68 +1,86 @@
 import { PokerEvaluator } from './evaluator.js';
 
 export class PokerStrategy {
-  static getRecommendation(handCards, communityCards, currentStage = 'FLOP', potSize = 1200) {
+  static getRecommendation(handCards, communityCards, currentStage = null, potSize = 1200) {
     const activeHand = PokerEvaluator.getValidCards(handCards);
     const activeComm = PokerEvaluator.getValidCards(communityCards);
 
+    // 1. Deteksi Otomatis Stage berdasarkan Jumlah Kartu Komunitas
+    let stage = currentStage;
+    if (!stage || typeof stage !== 'string') {
+      if (activeComm.length === 3) stage = 'FLOP';
+      else if (activeComm.length === 4) stage = 'TURN';
+      else if (activeComm.length === 5) stage = 'RIVER';
+      else stage = 'PRE-FLOP';
+    }
+
     if (activeHand.length < 2) {
-      return { action: "WAIT", size: "0 Chips", text: "Pilih 2 Kartu Tangan Terlebih Dahulu" };
+      return { 
+        action: "WAIT", 
+        size: "0 Chips", 
+        color: "secondary", 
+        text: "Pilih 2 Kartu Tangan Terlebih Dahulu" 
+      };
     }
 
     const totalCards = [...activeHand, ...activeComm];
     const bestHand = PokerEvaluator.getBestHand(totalCards);
-    const nutAnalysis = PokerEvaluator.getBoardNutHand(activeComm);
+    
+    // Safety check untuk nutAnalysis
+    let nutAnalysis = { hasFlushThreat: false, highestThreat: "-" };
+    if (typeof PokerEvaluator.getBoardNutHand === 'function') {
+      nutAnalysis = PokerEvaluator.getBoardNutHand(activeComm) || nutAnalysis;
+    }
 
-    // KONDISI KRUSIAL RIVER: Kita memegang Straight TAPI Meja Punya Potensi Flush (3+ Same Suit)
+    // 2. KONDISI KRUSIAL: Kartu Straight TAPI Meja Punya Potensi Flush (3+ Same Suit)
     if (bestHand.score === 5 && nutAnalysis.hasFlushThreat) {
       return {
-        action: "CHECK / CALL (PERINGATAN)",
+        action: "CHECK / CALL (WARNING)",
         size: `${Math.round(potSize * 0.3)} Chips`,
         color: "warning",
-        text: `[${currentStage}] Kombinasi Terbentuk: Straight! ⚠️ TETAPI PERHATIKAN MEJA: Terdapat potensi ${nutAnalysis.highestThreat}. Jangan All-In, kontrol pot dengan Check/Call!`
+        text: `[${stage}] Kombinasi Terbentuk: Straight! ⚠️ Waspada potensi ${nutAnalysis.highestThreat}. Kontrol pot dengan Check/Call!`
       };
     }
 
-    // Jika Kombinasi Lebih Tinggi dari Flush (Flush, Full House, Quads, Straight Flush, Royal Flush)
+    // 3. Kombinasi Flush ke Atas (Flush, Full House, Quads, Straight Flush, Royal)
     if (bestHand.score >= 6) {
       return {
         action: "RAISE / ALL-IN",
         size: `${potSize * 2} Chips`,
         color: "danger",
-        text: `[${currentStage}] Kombinasi Terbentuk: ${bestHand.rankName}! Kartu sangat kuat, lakukan Value Bet besar atau Raise/All-In.`
+        text: `[${stage}] Kombinasi Terbentuk: ${bestHand.rankName}! Kartu sangat kuat, lakukan Value Bet besar atau Raise/All-In.`
       };
     }
 
-    // Jika Memegang Straight Tanpa Potensi Flush Lawan
+    // 4. Straight Tanpa Ancaman Flush
     if (bestHand.score === 5) {
       return {
         action: "RAISE / BET",
         size: `${potSize * 1.5} Chips`,
         color: "success",
-        text: `[${currentStage}] Kombinasi Terbentuk: Straight! Meja aman, lakukan Raise untuk memaksimalkan pot.`
+        text: `[${stage}] Kombinasi Terbentuk: Straight! Meja aman, lakukan Raise untuk memaksimalkan pot.`
       };
     }
 
-    // Two Pair / Three of a Kind
+    // 5. Two Pair / Three of a Kind
     if (bestHand.score >= 3) {
       return {
         action: "BET / RAISE",
         size: `${potSize} Chips`,
         color: "success",
-        text: `[${currentStage}] Kombinasi Terbentuk: ${bestHand.rankName}. Pegang kendali permainan dengan taruhan sedang.`
+        text: `[${stage}] Kombinasi Terbentuk: ${bestHand.rankName}. Pegang kendali permainan dengan taruhan sedang.`
       };
     }
 
-    // One Pair
+    // 6. One Pair / Pocket Pair
     if (bestHand.score === 2) {
-      // Cek apakah pair As di meja mengancam Pocket Pair K-K/Q-Q
       const commRanks = activeComm.map(c => c.rank.value);
       if (commRanks.includes(14) && activeHand[0].rank.value < 14 && activeHand[1].rank.value < 14) {
         return {
           action: "CHECK / FOLD",
           size: "0 Chips",
           color: "warning",
-          text: `[${currentStage}] Kartu Meja Memiliki As! Pair Tangan Anda berisiko kalah oleh lawan yang memegang As.`
+          text: `[${stage}] Kartu Meja Memiliki As! Pair Tangan Anda berisiko kalah oleh lawan yang memegang As.`
         };
       }
 
@@ -70,27 +88,27 @@ export class PokerStrategy {
         action: "CHECK / CALL",
         size: `${Math.round(potSize * 0.5)} Chips`,
         color: "info",
-        text: `[${currentStage}] Kombinasi Terbentuk: One Pair. Mainkan secara pasif untuk melihat kartu berikutnya.`
+        text: `[${stage}] Kombinasi Terbentuk: One Pair / Pocket Pair. Mainkan pasif untuk melihat kartu berikutnya.`
       };
     }
 
-    // Ada Potensi Draw (Kurang 1 Kartu)
+    // 7. Ada Potensi Draw (Full House Draw, Flush Draw, Straight Draw, dll)
     if (bestHand.draws && bestHand.draws.length > 0) {
       const topDraw = bestHand.draws[0];
       return {
         action: "CHECK / CALL",
         size: `${Math.round(potSize * 0.4)} Chips`,
         color: "info",
-        text: `[${currentStage}] ${topDraw.text}! ${topDraw.needed}. Lakukan Call murah untuk mengejar kombinasi.`
+        text: `[${stage}] Potensi ${topDraw.text}! ${topDraw.needed}. Lakukan Call murah untuk mengejar kombinasi.`
       };
     }
 
-    // High Card
+    // 8. High Card
     return {
       action: "CHECK / FOLD",
       size: "0 Chips",
       color: "secondary",
-      text: `[${currentStage}] Kombinasi Belum Terbentuk (High Card). Disarankan Check atau Fold jika ada Raise besar dari lawan.`
+      text: `[${stage}] Kombinasi Belum Terbentuk (High Card). Disarankan Check atau Fold jika ada Raise besar.`
     };
   }
 }
