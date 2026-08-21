@@ -42,6 +42,7 @@ export class PokerEvaluator {
     ranks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
     
     const pairedRanks = Object.keys(rankCounts).filter(r => rankCounts[r] >= 2).map(Number);
+    const tripRanks = Object.keys(rankCounts).filter(r => rankCounts[r] === 3).map(Number);
     const hasBoardPair = pairedRanks.length > 0;
 
     // Hitung Kemunculan Suit
@@ -52,31 +53,32 @@ export class PokerEvaluator {
     });
     const maxSuitCount = Math.max(...Object.values(suitCounts), 0);
 
-    // 1. ANCAMAN PAIR DI MEJA
-    if (hasBoardPair) {
+    // 1. ANCAMAN JIKA MEJA ADA TRIPS (Misal 2-2-2)
+    if (tripRanks.length > 0) {
+      const tripVal = tripRanks[0];
+      const tripLabel = tripVal === 14 ? 'As' : tripVal === 13 ? 'King' : tripVal === 12 ? 'Queen' : tripVal === 11 ? 'Jack' : tripVal;
+      
+      threats.push({
+        text: `⚠️ Meja Ada Trips (${tripLabel}-${tripLabel}-${tripLabel})!`,
+        nutText: `Kartu Lawan yang Bikin Kalah: Memegang Kartu [${tripLabel}] (Four of a Kind) ATAU POCKET PAIR (Sepasang Kartu Kembar di Tangan seperti 8-8 / 7-7) yang membuat Full House Lebih Tinggi.`,
+        safe: false
+      });
+    }
+    // 2. ANCAMAN JIKA MEJA ADA PAIR BIASA (Misal 2-2)
+    else if (hasBoardPair) {
       const pairedLabel = pairedRanks.map(r => r === 14 ? 'As' : r === 13 ? 'King' : r === 12 ? 'Queen' : r === 11 ? 'Jack' : r).join(', ');
       threats.push({
-        text: `⚠️ Meja Ada Pair (${pairedLabel})! Lawan berpotensi dapat Three of a Kind / Full House`,
-        nutText: `Kartu Lawan yang Bikin Kalah: Memegang Kartu [${pairedLabel}] (Jadi Trip/Quads) atau [Kartu Pasangan Meja]`,
+        text: `⚠️ Meja Ada Pair (${pairedLabel})! Mendorong Potensi Trips / Full House`,
+        nutText: `Kartu Lawan yang Bikin Kalah: Memegang Kartu [${pairedLabel}] (Jadi Trips) atau Pocket Pair Lebih Tinggi`,
         safe: false
       });
     }
 
-    // 2. ANCAMAN FLUSH
+    // 3. ANCAMAN FLUSH
     if (maxSuitCount >= 3) {
       threats.push({
         text: `⚠️ Papan Rawan Flush (${maxSuitCount} Kartu Sejenis)`,
         nutText: "Kartu Lawan yang Bikin Kalah: Memegang 2 Kartu dengan Simbol Sejenis",
-        safe: false
-      });
-    }
-
-    // 3. ANCAMAN OVERCARDS / KARTU TINGGI
-    if (!hasBoardPair && ranks[0] >= 12 && maxSuitCount < 3) {
-      const highLabel = ranks[0] === 14 ? 'As' : ranks[0] === 13 ? 'King' : 'Queen';
-      threats.push({
-        text: `⚠️ Ada Kartu Tinggi (${highLabel}) di Meja`,
-        nutText: `Kartu Lawan yang Bikin Kalah: Memegang Kartu [${highLabel}] / Set`,
         safe: false
       });
     }
@@ -96,7 +98,7 @@ export class PokerEvaluator {
   static checkStraight(uniqueRanks, validCards) {
     let ranks = [...uniqueRanks];
     if (ranks.includes(14)) {
-      ranks.push(1); // As bernilai 1 untuk Straight rendah (A-2-3-4-5)
+      ranks.push(1);
     }
 
     for (let i = 0; i <= ranks.length - 5; i++) {
