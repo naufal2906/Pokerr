@@ -2,9 +2,11 @@ export class PokerEvaluator {
   static RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   static SUITS = ['♠', '♥', '♦', '♣'];
 
+  // 1. Dapatkan Kombinasi Kartu Terbaik
   static getBestHand(cards) {
-    const validCards = (cards || []).filter(c => c !== null && c !== undefined);
-    
+    // Filter kartu valid (mengabaikan null/undefined)
+    const validCards = (cards || []).filter(c => c && c.rank && typeof c.rank.value !== 'undefined');
+
     if (validCards.length === 0) {
       return { score: 0, rankName: "High Card" };
     }
@@ -23,7 +25,8 @@ export class PokerEvaluator {
       }
     }
 
-    const ranks = [...new Set(validCards.map(c => c.rank ? c.rank.value : 0))].filter(v => v > 0).sort((a, b) => a - b);
+    // Tampilkan informasi tambahan jika ada indikasi Straight Draw
+    const ranks = [...new Set(validCards.map(c => c.rank.value))].sort((a, b) => a - b);
     const drawText = this.checkStraightDrawNeeded(ranks);
     if (drawText && bestHand.score < 5) {
       bestHand.rankName += ` (${drawText})`;
@@ -32,17 +35,18 @@ export class PokerEvaluator {
     return bestHand;
   }
 
+  // Evaluasi jika kartu kurang dari 5 (Pre-Flop / Flop tidak lengkap)
   static evaluateSubset(cards) {
     if (!cards || cards.length === 0) return { score: 0, rankName: "High Card" };
 
-    const ranks = cards.map(c => c.rank ? c.rank.value : 0).filter(r => r > 0);
+    const ranks = cards.map(c => c.rank.value);
     const counts = {};
     ranks.forEach(r => counts[r] = (counts[r] || 0) + 1);
 
     const values = Object.values(counts);
     if (values.includes(4)) return { score: 8, rankName: "Four of a Kind (Quads)" };
     if (values.includes(3)) return { score: 4, rankName: "Three of a Kind (Trips)" };
-    
+
     const pairCount = values.filter(v => v === 2).length;
     if (pairCount >= 2) return { score: 3, rankName: "Two Pair" };
     if (pairCount === 1) return { score: 2, rankName: "One Pair" };
@@ -50,15 +54,17 @@ export class PokerEvaluator {
     return { score: 1, rankName: "High Card" };
   }
 
+  // Evaluasi 5 Kartu Murni
   static evaluate5CardHand(cards) {
     const isFlush = cards.every(c => c.suit.symbol === cards[0].suit.symbol);
     const ranks = cards.map(c => c.rank.value).sort((a, b) => a - b);
 
+    // Cek Straight
     let isStraight = false;
     if (ranks[4] - ranks[0] === 4 && new Set(ranks).size === 5) {
       isStraight = true;
     } else if (ranks[4] === 14 && ranks[0] === 2 && ranks[1] === 3 && ranks[2] === 4 && ranks[3] === 5) {
-      isStraight = true;
+      isStraight = true; // Wheel Straight (A-2-3-4-5)
     }
 
     if (isFlush && isStraight) return { score: 9, rankName: "Straight Flush" };
@@ -78,14 +84,18 @@ export class PokerEvaluator {
     return { score: 1, rankName: "High Card" };
   }
 
+  // Deteksi Teks Kartu Penyambung Straight (A/9 dll)
   static checkStraightDrawNeeded(ranks) {
     const rankSet = new Set(ranks);
     const needed = [];
 
+    // Kasus 10-J-Q-K
     if (rankSet.has(10) && rankSet.has(11) && rankSet.has(12) && rankSet.has(13)) {
       if (!rankSet.has(14)) needed.push("As");
       if (!rankSet.has(9)) needed.push("9");
-    } else if (rankSet.has(9) && rankSet.has(10) && rankSet.has(11) && rankSet.has(12)) {
+    }
+    // Kasus 9-10-J-Q
+    else if (rankSet.has(9) && rankSet.has(10) && rankSet.has(11) && rankSet.has(12)) {
       if (!rankSet.has(13)) needed.push("King");
       if (!rankSet.has(8)) needed.push("8");
     }
@@ -96,6 +106,7 @@ export class PokerEvaluator {
     return null;
   }
 
+  // Helper Kombinasi 5 Kartu
   static getCombinations(arr, k) {
     if (k === 0 || arr.length < k) return [[]];
     if (k === arr.length) return [arr];
@@ -105,9 +116,10 @@ export class PokerEvaluator {
     return [...withFirst, ...withoutFirst];
   }
 
+  // Analisis Potensi Bahaya Kartu Komunitas
   static analyzeBoardThreats(communityCards) {
     const threats = [];
-    const validComm = (communityCards || []).filter(c => c !== null);
+    const validComm = (communityCards || []).filter(c => c && c.rank);
     if (validComm.length < 3) return threats;
 
     const suitCounts = {};
@@ -129,9 +141,10 @@ export class PokerEvaluator {
     return threats;
   }
 
+  // Hitung Estimasi Win Equity Sederhana
   static calculateStrength(handCards, communityCards) {
-    const activeHand = (handCards || []).filter(c => c !== null);
-    const activeComm = (communityCards || []).filter(c => c !== null);
+    const activeHand = (handCards || []).filter(c => c && c.rank);
+    const activeComm = (communityCards || []).filter(c => c && c.rank);
     if (activeHand.length < 2) return 0;
 
     const total = [...activeHand, ...activeComm];
