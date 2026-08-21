@@ -1,9 +1,8 @@
 import { PokerEvaluator } from './evaluator.js';
 
 export class PokerStrategy {
-  // Penentuan Tier Pre-Flop
   static getPreFlopTier(handCards) {
-    if (handCards.length < 2) return 0;
+    if (!handCards || handCards.length < 2) return 0;
 
     const c1 = handCards[0];
     const c2 = handCards[1];
@@ -13,9 +12,9 @@ export class PokerStrategy {
     const isSuited = c1.suit.symbol === c2.suit.symbol;
 
     if (isPair) {
-      if (high >= 11) return 1; // Pocket Premium (AA, KK, QQ, JJ)
-      if (high >= 8) return 2;  // Pocket Medium (1010, 99, 88)
-      return 3;                 // Pocket Small (77-22)
+      if (high >= 11) return 1;
+      if (high >= 8) return 2;
+      return 3;
     }
 
     if (high === 14) {
@@ -31,10 +30,9 @@ export class PokerStrategy {
     return 4;
   }
 
-  // Rekomendasi Taruhan Berdasarkan Situasi Meja (Default Blind 300/600)
   static getBettingRecommendation(handCards, communityCards, bigBlind = 600) {
-    const activeHand = handCards.filter(c => c !== null);
-    const activeCommunity = communityCards.filter(c => c !== null);
+    const activeHand = (handCards || []).filter(c => c !== null);
+    const activeCommunity = (communityCards || []).filter(c => c !== null);
 
     if (activeHand.length < 2) {
       return { action: "WAIT", amount: 0, reason: "Masukkan 2 kartu tangan untuk analisis strategi." };
@@ -42,7 +40,6 @@ export class PokerStrategy {
 
     const commCount = activeCommunity.length;
 
-    // === 1. FASE PRE-FLOP ===
     if (commCount === 0) {
       const tier = this.getPreFlopTier(activeHand);
 
@@ -74,7 +71,6 @@ export class PokerStrategy {
       }
     }
 
-    // === 2. FASE POST-FLOP (FLOP, TURN, RIVER) ===
     const totalCards = [...activeHand, ...activeCommunity];
     const bestHand = PokerEvaluator.getBestHand(totalCards);
     const threats = PokerEvaluator.analyzeBoardThreats(activeCommunity);
@@ -82,7 +78,6 @@ export class PokerStrategy {
     const boardRanks = activeCommunity.map(c => c.rank.value);
     const maxBoardRank = boardRanks.length > 0 ? Math.max(...boardRanks) : 0;
 
-    // Deteksi Papan Rawan Straight Tinggi (misal 10, J, Q)
     const hasHeavyConnectorBoard = boardRanks.filter(r => r >= 10).length >= 3;
 
     const commCounts = {};
@@ -92,12 +87,11 @@ export class PokerStrategy {
     const hasStraightThreat = threats.some(t => t.text.includes("Straight")) || hasHeavyConnectorBoard;
     const hasDangerThreat = threats.some(t => !t.safe) || hasStraightThreat;
 
-    let phaseName = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
+    let phaseName = commCount < 3 ? "FLOP (BELUM LENGKAP)" : commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
 
     const isPocketPair = activeHand[0].rank.value === activeHand[1].rank.value;
     const isOverpair = isPocketPair && activeHand[0].rank.value > maxBoardRank;
 
-    // A. MONSTER HAND
     if (bestHand.score >= 6) {
       if (hasTripsOnBoard && bestHand.score === 7) {
         return {
@@ -114,7 +108,6 @@ export class PokerStrategy {
       };
     }
 
-    // B. OVERPAIR DENGAN PAPAN BERBAHAYA (Kasus K-K vs 10-Q-J)
     if (isOverpair && hasStraightThreat) {
       return {
         action: "CHECK / CALL",
@@ -123,9 +116,8 @@ export class PokerStrategy {
       };
     }
 
-    // C. STRONG HAND BIASA
     if (bestHand.score >= 3 || isOverpair) {
-      if (hasDangerThreat && phaseName !== "FLOP") {
+      if (hasDangerThreat && commCount >= 4) {
         return {
           action: "CHECK / CALL",
           amount: 1200,
@@ -140,7 +132,6 @@ export class PokerStrategy {
       };
     }
 
-    // D. ANALISIS POTENSI DRAW (Mencari Kartu tambahan di Flop & Turn)
     if (commCount < 5) {
       const suitCounts = {};
       totalCards.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
@@ -165,7 +156,6 @@ export class PokerStrategy {
       }
     }
 
-    // E. MEDIUM HAND
     if (bestHand.score === 2) {
       if (hasDangerThreat) {
         return {
@@ -182,7 +172,6 @@ export class PokerStrategy {
       };
     }
 
-    // F. HIGH CARD / DRAW FOLD
     return {
       action: "CHECK / FOLD",
       amount: 0,
