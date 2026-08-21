@@ -19,33 +19,35 @@ function createCardUI(card) {
 function updateEvaluation() {
   const totalCards = [...currentHand, ...currentCommunity];
 
-  // 1. Kombinasi Kartu Saat Ini & Persentase Kekuatan Tangan
-  document.getElementById('current-hand-made').innerText = 
-    PokerEvaluator.evaluateMadeHand(totalCards);
+  // 1. Evaluasi Tangan Sendiri + Win Equity
+  const myBest = PokerEvaluator.getBestHand(totalCards);
+  document.getElementById('my-best-hand').innerText = myBest.rankName;
 
   const percentage = PokerEvaluator.calculateStrength(currentHand, currentCommunity);
   document.getElementById('strength-bar').style.width = `${percentage}%`;
   document.getElementById('strength-percent').innerText = `${percentage}%`;
 
-  // 2. Daftar Potensi / Perkiraan Kombinasi
-  const potentialContainer = document.getElementById('potential-draws');
-  potentialContainer.innerHTML = '';
-  const potentials = PokerEvaluator.detectPotentialDraws(currentHand, currentCommunity);
-  potentials.forEach(item => {
+  // 2. Evaluasi Murni Kartu Komunitas (Board Only)
+  document.getElementById('board-only-hand').innerText = 
+    PokerEvaluator.evaluateBoardOnly(currentCommunity);
+
+  // 3. Analisis Potensi Ancaman Meja (Board Threat)
+  const threatContainer = document.getElementById('board-threats');
+  threatContainer.innerHTML = '';
+  const threats = PokerEvaluator.analyzeBoardThreats(currentCommunity);
+  threats.forEach(t => {
     const div = document.createElement('div');
-    div.className = 'potential-item';
-    div.innerText = item;
-    potentialContainer.appendChild(div);
+    div.className = `potential-item ${t.safe ? 'safe' : ''}`;
+    div.innerText = t.text;
+    threatContainer.appendChild(div);
   });
 
-  // 3. Kombinasi Terbaik Saat Ini (5 Kartu)
-  const bestResult = PokerEvaluator.getBestHand(totalCards);
-  document.getElementById('result-name').innerText = bestResult.rankName;
-  
+  // 4. Tampilkan 5 Kartu Terbaik Anda
+  document.getElementById('result-name').innerText = myBest.rankName;
   const bestGroup = document.getElementById('best-cards');
   bestGroup.innerHTML = '';
-  if (bestResult.cards && bestResult.cards.length === 5) {
-    bestResult.cards.forEach(c => bestGroup.appendChild(createCardUI(c)));
+  if (myBest.cards && myBest.cards.length > 0) {
+    myBest.cards.forEach(c => bestGroup.appendChild(createCardUI(c)));
   }
 }
 
@@ -62,7 +64,7 @@ function renderBoard() {
   updateEvaluation();
 }
 
-// System Modal 2 Langkah (Simbol -> Nilai)
+// Modal System Picker
 const modal = document.getElementById('card-picker-modal');
 const rankStep = document.getElementById('rank-step');
 const rankGrid = document.getElementById('rank-grid');
