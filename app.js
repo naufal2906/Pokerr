@@ -110,7 +110,7 @@ function updateEvaluation() {
     if (resultNameEl) resultNameEl.innerText = "Masukkan Kartu Tangan / Komunitas";
   }
 
-  // 6. Pembaharuan Saran Betting Strategi
+  // 6. Pembaharuan Saran Strategi Bermain (Fitur Chips/Betting Size Dihapus)
   const strat = PokerStrategy.getStrategy(activeHandCards, activeCommunityCards, myBest);
   
   const actionEl = document.getElementById('strat-action');
@@ -129,10 +129,19 @@ function updateEvaluation() {
     }
   }
 
+  // Sembunyikan elemen Estimasi Chips jika ada di HTML
   const stratAmountEl = document.getElementById('strat-amount');
+  if (stratAmountEl) {
+    stratAmountEl.style.display = 'none';
+    if (stratAmountEl.parentElement) {
+      stratAmountEl.parentElement.style.display = 'none'; // Sembunyikan container baris Chips
+    }
+  }
+
   const stratReasonEl = document.getElementById('strat-reason');
-  if (stratAmountEl) stratAmountEl.innerText = strat.amount || '0 Chips';
-  if (stratReasonEl) stratReasonEl.innerText = strat.reason || 'Masukkan kartu untuk mendapatkan saran strategi.';
+  if (stratReasonEl) {
+    stratReasonEl.innerText = strat.reason || 'Masukkan kartu untuk mendapatkan saran strategi.';
+  }
 }
 
 function renderBoard() {
