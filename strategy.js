@@ -34,12 +34,12 @@ export class PokerStrategy {
     const activeCommunity = communityCards.filter(c => c !== null);
 
     if (activeHand.length < 2) {
-      return { action: "WAIT", amount: 0, reason: "Masukkan 2 kartu tangan untuk saran betting." };
+      return { action: "WAIT", amount: 0, reason: "Masukkan 2 kartu tangan untuk analisis strategi." };
     }
 
     const commCount = activeCommunity.length;
 
-    // === 1. PASE PRE-FLOP ===
+    // === 1. FASE PRE-FLOP ===
     if (commCount === 0) {
       const tier = this.getPreFlopTier(activeHand);
 
@@ -71,24 +71,37 @@ export class PokerStrategy {
       }
     }
 
-    // === 2. PASE POST-FLOP (FLOP, TURN, RIVER) ===
+    // === 2. FASE POST-FLOP (FLOP, TURN, RIVER) ===
     const totalCards = [...activeHand, ...activeCommunity];
     const bestHand = PokerEvaluator.getBestHand(totalCards);
     const equity = PokerEvaluator.calculateStrength(activeHand, activeCommunity);
     const threats = PokerEvaluator.analyzeBoardThreats(activeCommunity);
-    
-    // Pengecekan spesifik ancaman Straight & Flush di meja
+
+    // Cek apakah ada 3 kartu kembar di meja (Trips di Board)
+    const commCounts = {};
+    activeCommunity.forEach(c => commCounts[c.rank.value] = (commCounts[c.rank.value] || 0) + 1);
+    const hasTripsOnBoard = Object.values(commCounts).some(count => count >= 3);
+
     const hasStraightThreat = threats.some(t => t.text.includes("Straight"));
     const hasDangerThreat = threats.some(t => !t.safe) || hasStraightThreat;
 
     let phaseName = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
 
     // Kategori Kombinasi Kartu
-    const isMonster = bestHand.score >= 6; // Flush, Full House, 4-of-a-kind
+    const isMonster = bestHand.score >= 6; // Flush, Full House, Four of a Kind, Straight Flush, Royal Flush
     const isStrong = bestHand.score >= 3;  // Two Pair, Three of a Kind, Straight
 
     // A. Monster Hand
     if (isMonster) {
+      // PENJAGAAN KETAT: Jika membuat Full House (score === 7), tapi di meja ada Trips (3 kartu angka sama)
+      if (hasTripsOnBoard && bestHand.score === 7) {
+        return {
+          action: "CHECK / CALL",
+          amount: bigBlind,
+          reason: `[${phaseName}] Anda memegang Full House, tetapi ada 3 kartu kembar di meja. Waspada lawan memegang 1 kartu penyempurna Four of a Kind (Quads). Mainkan Check/Call saja.`
+        };
+      }
+
       return {
         action: "RAISE / BET",
         amount: bigBlind * 4,
@@ -98,7 +111,6 @@ export class PokerStrategy {
 
     // B. Strong Hand (Three of a Kind / Two Pair / Straight)
     if (isStrong) {
-      // PERBAIKAN KHUSUS RIVER: Jika memegang Set/Trips tapi papan terkoneksi Straight
       if (phaseName === "RIVER" && hasStraightThreat) {
         return {
           action: "CHECK / CALL",
