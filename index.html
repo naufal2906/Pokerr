@@ -1,231 +1,36 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kalkulator Poker Odds RGB</title>
-    <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            max-width: 450px; 
-            margin: 20px auto; 
-            padding: 15px; 
-            background: #0a0a0c; 
-            color: #fff; 
-        }
-        
-        /* Card Utama dengan Bintang Border RGB Glowing */
-        .card { 
-            background: #141419; 
-            padding: 22px; 
-            border-radius: 16px; 
-            position: relative;
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.15);
-            border: 1px solid rgba(0, 255, 204, 0.3);
-        }
-
-        h2 { 
-            text-align: center; 
-            color: #00ffcc; 
-            margin-top: 0; 
-            text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
-            letter-spacing: 1px;
-        }
-
-        label { 
-            display: block; 
-            margin-top: 14px; 
-            font-weight: 600; 
-            font-size: 0.9em; 
-            color: #b0b0ba; 
-        }
-
-        select, input { 
-            width: 100%; 
-            padding: 12px; 
-            margin-top: 6px; 
-            border-radius: 8px; 
-            border: 1px solid #2a2a35; 
-            box-sizing: border-box; 
-            font-size: 0.95em; 
-            background: #1e1e26; 
-            color: #fff;
-            outline: none;
-            transition: all 0.3s ease;
-        }
-
-        select:focus, input:focus {
-            border-color: #00ffcc;
-            box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
-        }
-
-        /* Tombol Utama Gaya LED RGB Gradient Animation */
-        .btn-rgb {
-            width: 100%;
-            padding: 14px;
-            margin-top: 22px;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            font-size: 1em;
-            color: #fff;
-            background: linear-gradient(45deg, #ff0055, #7a00ff, #00e5ff, #ff0055);
-            background-size: 300% 300%;
-            animation: rgbGradient 6s ease infinite;
-            cursor: pointer;
-            box-shadow: 0 0 15px rgba(122, 0, 255, 0.4);
-            transition: transform 0.2s;
-        }
-
-        .btn-rgb:active {
-            transform: scale(0.98);
-        }
-
-        @keyframes rgbGradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        .result { 
-            margin-top: 18px; 
-            padding: 14px; 
-            border-radius: 10px; 
-            text-align: center; 
-            font-size: 1.05em; 
-            font-weight: bold; 
-        }
-
-        .call { 
-            background: rgba(40, 167, 69, 0.15); 
-            color: #2ecc71; 
-            border: 1px solid #2ecc71; 
-            box-shadow: 0 0 12px rgba(46, 204, 113, 0.3);
-        }
-
-        .fold { 
-            background: rgba(220, 53, 69, 0.15); 
-            color: #ff4d4d; 
-            border: 1px solid #ff4d4d; 
-            box-shadow: 0 0 12px rgba(255, 77, 77, 0.3);
-        }
-        
-        .cheat-sheet { 
-            margin-top: 22px; 
-            padding: 15px; 
-            background: #181820; 
-            border-radius: 10px; 
-            font-size: 0.85em; 
-            color: #ccc; 
-            border: 1px solid #2a2a35;
-        }
-
-        .cheat-sheet h3 { 
-            margin-top: 0; 
-            color: #00ffcc; 
-            text-align: center; 
-            font-size: 1.05em; 
-            border-bottom: 1px solid #2a2a35; 
-            padding-bottom: 8px; 
-        }
-
-        .cheat-item { 
-            margin-bottom: 8px; 
-            line-height: 1.4; 
-        }
-
-        /* Penanda Warna Khusus Poin Terpopuler */
-        .hot-item {
-            color: #00ffcc;
-            font-weight: bold;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poker Hand Evaluator</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<div class="card">
-    <h2>POKER DECISION MAKER</h2>
+  <div class="container">
+    <h1>Poker Hand Evaluator ♠♥♣♦</h1>
     
-    <label>Kondisi Kartu Anda (Outs):</label>
-    <select id="outs">
-        <!-- Opsi Paling Sering Dipakai Ditandai [SERING] -->
-        <optgroup label="★ PALING SERING DIPAKAI (DRAWS)">
-            <option value="9" selected>🔥 [SERING] Flush Draw - Kurang 1 Sejenis (9 Outs)</option>
-            <option value="8">🔥 [SERING] Straight 2 Ujung - Kurang 1 Ujung (8 Outs)</option>
-            <option value="15">🔥 [SERING] Flush + Straight Draw (15 Outs)</option>
-            <option value="12">🔥 [SERING] Flush + Pair Draw (12 Outs)</option>
-            <option value="4">🔥 [SERING] Straight Gutshot - Bolong Tengah (4 Outs)</option>
-        </optgroup>
-        <optgroup label="⚙️ LAINNYA (MADE HANDS)">
-            <option value="10">Three of a Kind -> Full House (10 Outs)</option>
-            <option value="7">Two Pair -> Full House (4 Outs)</option>
-            <option value="6">Dua Kartu Over / Overcards (6 Outs)</option>
-            <option value="2">Pair di Tangan -> Set (2 Outs)</option>
-        </optgroup>
-    </select>
+    <div class="board">
+      <div class="section">
+        <h2>Kartu Tangan (Hole Cards)</h2>
+        <div id="hand-cards" class="card-group"></div>
+      </div>
 
-    <label>Ronde Saat Ini:</label>
-    <select id="stage">
-        <option value="4">Flop (Sisa 2 Kartu / x4)</option>
-        <option value="2">Turn (Sisa 1 Kartu / x2)</option>
-    </select>
-
-    <label>Isi Pot Saat Ini (Rp):</label>
-    <input type="number" id="pot" placeholder="Contoh: 12000">
-
-    <label>Biaya Call (Rp):</label>
-    <input type="number" id="call" placeholder="Contoh: 2400">
-
-    <button class="btn-rgb" onclick="calculateOdds()">HITUNG KEPUTUSAN</button>
-
-    <div id="output" class="result" style="display:none;"></div>
-
-    <div class="cheat-sheet">
-        <h3>PANDUAN KARTU (UNTUK DIHAFAL)</h3>
-        <div class="cheat-item hot-item">★ 9 Outs: Kurang 1 kartu sejenis untuk Flush.</div>
-        <div class="cheat-item hot-item">★ 8 Outs: Kurang 1 angka di ujung untuk Straight.</div>
-        <div class="cheat-item hot-item">★ 15 Outs: Kurang 1 kartu untuk Flush ATAU Straight.</div>
-        <div class="cheat-item hot-item">★ 12 Outs: Kurang 1 kartu sejenis (Flush) ATAU Pair.</div>
-        <div class="cheat-item hot-item">★ 4 Outs (Gutshot): Kurang 1 angka bolong tengah.</div>
-        <hr style="border:0; border-top:1px solid #2a2a35; margin:10px 0;">
-        <div class="cheat-item">10 Outs: Punya 3 kembar -> cari 1 kartu lagi untuk Full House.</div>
-        <div class="cheat-item">6 Outs: Punya kartu tinggi -> cari kartu As/King agar jadi Pair.</div>
-        <div class="cheat-item">4 Outs (Two Pair): Punya 2 pasang -> cari 1 kartu lagi untuk Full House.</div>
-        <div class="cheat-item">2 Outs: Punya Pair di tangan -> cari 1 kartu lagi untuk 3 Kembar.</div>
+      <div class="section">
+        <h2>Kartu Komunitas (Board)</h2>
+        <div id="community-cards" class="card-group"></div>
+      </div>
     </div>
-</div>
 
-<script>
-function calculateOdds() {
-    const outs = parseFloat(document.getElementById('outs').value);
-    const multiplier = parseFloat(document.getElementById('stage').value);
-    const currentPot = parseFloat(document.getElementById('pot').value);
-    const callAmount = parseFloat(document.getElementById('call').value);
+    <button id="btn-deal">Kocok & Bagi Kartu</button>
 
-    if (isNaN(currentPot) || isNaN(callAmount)) {
-        alert("Harap isi angka pada kolom Pot dan Biaya Call!");
-        return;
-    }
+    <div class="result-box">
+      <h2>Kombinasi Tertinggi:</h2>
+      <div id="result-name">-</div>
+      <div id="best-cards" class="card-group"></div>
+    </div>
+  </div>
 
-    const winProb = outs * multiplier;
-    const totalPotAfterCall = currentPot + callAmount;
-    const costPercent = (callAmount / totalPotAfterCall) * 100;
-
-    const isWorth = winProb > costPercent;
-    const recommendation = isWorth ? "CALL" : "FOLD";
-    
-    const outputDiv = document.getElementById('output');
-    outputDiv.style.display = "block";
-    outputDiv.className = "result " + (isWorth ? "call" : "fold");
-    
-    outputDiv.innerHTML = `
-        Peluang Menang: ${winProb}%<br>
-        Biaya Taruhan: ${costPercent.toFixed(1)}%<br>
-        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.15); margin:8px 0;">
-        Rekomendasi: <strong>${recommendation}</strong>
-    `;
-}
-</script>
-
+  <script type="module" src="app.js"></script>
 </body>
 </html>
