@@ -9,14 +9,22 @@ export class PokerEvaluator {
     return [...withHead, ...withoutHead];
   }
 
-  static evaluateHoleCards(cards) {
-    if (cards.length === 0) return "-";
-    if (cards.length === 1) return `High Card (${cards[0].rank.label})`;
-    if (cards[0].rank.value === cards[1].rank.value) {
-      return `One Pair (${cards[0].rank.label})`;
+  // Evaluasi khusus kombinasi yang sudah terbentuk saat ini (Made Hand)
+  static evaluateMadeHand(allCards) {
+    if (allCards.length === 0) return "-";
+    if (allCards.length < 5) {
+      // Jika kurang dari 5 kartu, cek Pair/Three of a Kind sederhana
+      const counts = {};
+      allCards.forEach(c => counts[c.rank.label] = (counts[c.rank.label] || 0) + 1);
+      const pairs = Object.entries(counts).filter(([_, count]) => count === 2);
+      const trips = Object.entries(counts).filter(([_, count]) => count === 3);
+
+      if (trips.length > 0) return `Three of a Kind (${trips[0][0]})`;
+      if (pairs.length === 2) return `Two Pair (${pairs[0][0]} & ${pairs[1][0]})`;
+      if (pairs.length === 1) return `One Pair (${pairs[0][0]})`;
+      return `High Card`;
     }
-    const high = cards[0].rank.value > cards[1].rank.value ? cards[0] : cards[1];
-    return `High Card (${high.rank.label})`;
+    return this.getBestHand(allCards).rankName;
   }
 
   static evaluate5CardHand(cards) {
@@ -57,9 +65,7 @@ export class PokerEvaluator {
   }
 
   static getBestHand(allCards) {
-    if (allCards.length < 5) {
-      return { rankName: 'Minimal 5 Kartu Aktif', cards: [] };
-    }
+    if (allCards.length < 5) return { rankName: 'Butuh minimal 5 kartu', cards: [] };
     const combinations = this.getCombinations(allCards, 5);
     let bestHand = null;
 
@@ -72,32 +78,70 @@ export class PokerEvaluator {
     return bestHand;
   }
 
-  // Kalkulasi Persentase Kekuatan Kartu (Win Equity Approximation)
-  static calculateStrength(handCards, communityCards) {
-    if (handCards.length === 0) return 0;
+  // Menghitung potensi/perkiraan kombinasi yang bisa terbentuk (Draws & Out Prospects)
+  static detectPotentialDraws(handCards, communityCards) {
+    const total = [...handCards, ...communityCards];
+    if (total.length === 0) return ["Masukkan Kartu Tangan"];
 
-    let baseEquity = 0;
-    const totalCards = [...handCards, ...communityCards];
+    const potentials = [];
 
-    if (totalCards.length < 5) {
-      // Ekuitas awal Pre-Flop berdasarkan 2 Kartu Tangan
-      const c1 = handCards[0];
-      const c2 = handCards[1];
-      if (!c2) return Math.round((c1.rank.value / 14) * 25);
+    // Cek Potensi Flush (4 kartu lambang sama)
+    const suitCounts = {};
+    total.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
+    Object.entries(suitCounts).forEach(([suit, count]) => {
+      if (count === 4) potentials.push(`♠♥♣♦ Flush Draw (Butuh 1 kartu ${suit} lagi)`);
+      if (count === 3 && total.length < 5) potentials.push(`♠♥♣♦ Backdoor Flush Potential (${suit})`);
+    });
 
-      const isPair = c1.rank.value === c2.rank.value;
-      const isSuited = c1.suit.symbol === c2.suit.symbol;
-      const highRank = Math.max(c1.rank.value, c2.rank.value);
+    // Cek Potensi Pair / Sets / Full House
+    const rankCounts = {};
+    total.forEach(c => rankCounts[c.rank.label] = (rankCounts[c.rank.label] || 0) + 1);
+    
+    let pairCount = 0;
+    let tripCount = 0;
+    Object.values(rankCounts).forEach(cnt => {
+      if (cnt === 2) pairCount++;
+      if (cnt === 3) tripCount++;
+    });
 
-      baseEquity = (highRank / 14) * 45;
-      if (isPair) baseEquity += 35;
-      if (isSuited) baseEquity += 10;
-    } else {
-      // Ekuitas setelah Flop / Turn / River berdasarkan Hand Rank Score
-      const best = this.getBestHand(totalCards);
-      baseEquity = (best.score / 9) * 100;
+    if (tripCount > 0) potentials.push("🔥 Potensi Full House / Four of a Kind");
+    else if (pairCount >= 2) potentials.push("⚡ Potensi Full House");
+    else if (pairCount === 1) potentials.push("📈 Potensi Three of a Kind / Two Pair");
+
+    // Cek Potensi Straight
+    const uniqueValues = [...new Set(total.map(c => c.rank.value))].sort((a,b) => a - b);
+    if (uniqueValues.length >= 4) {
+      for (let i = 0; i <= uniqueValues.length - 4; i++) {
+        if (uniqueValues[i+3] - uniqueValues[i] <= 4) {
+          potentials.push("🎯 Straight Draw (Potensi Straight)");
+          break;
+        }
+      }
     }
 
-    return Math.min(Math.round(baseEquity), 100);
+    if (potentials.length === 0) potentials.push("Tidak ada potensi draw khusus (High Card / Pair)");
+
+    return potentials;
+  }
+
+  // Kalkulasi persentase kekuatan kartu berdasarkan kombinasi aktif & potensi
+  static calculateStrength(handCards, communityCards) {
+    if (handCards.length === 0) return 0;
+    const total = [...handCards, ...communityCards];
+
+    if (total.length < 5) {
+      let equity = 30;
+      if (handCards.length === 2 && handCards[0].rank.value === handCards[1].rank.value) equity += 40;
+      if (communityCards.length > 0) {
+        const made = this.evaluateMadeHand(total);
+        if (made.includes('One Pair')) equity += 25;
+        if (made.includes('Two Pair')) equity += 45;
+        if (made.includes('Three of a Kind')) equity += 55;
+      }
+      return Math.min(equity, 100);
+    } else {
+      const best = this.getBestHand(total);
+      return Math.min(Math.round((best.score / 9) * 100), 100);
+    }
   }
 }
