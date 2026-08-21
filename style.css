@@ -221,6 +221,57 @@ h2 {
 .highlight-cyan { color: #00f0ff; font-weight: bold; }
 .highlight-green { color: #00ff66; font-weight: bold; }
 
+/* Style Khusus Kartu Strategi */
+.strategy-card {
+  border: 1px solid rgba(0, 240, 255, 0.3) !important;
+  background: rgba(0, 240, 255, 0.03) !important;
+  text-align: left;
+}
+
+.strategy-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.strategy-action-container, .strategy-amount-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.strategy-label {
+  font-size: 0.85rem;
+  color: #a0aec0;
+}
+
+.action-badge {
+  font-weight: bold;
+  font-size: 1.05rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #1e293b;
+  color: #00f0ff;
+  border: 1px solid #00f0ff;
+}
+
+.amount-badge {
+  font-weight: bold;
+  font-size: 1rem;
+  color: #ffbe0b;
+}
+
+.strategy-reason {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  margin: 6px 0 0 0;
+  line-height: 1.4;
+  background: rgba(0,0,0,0.2);
+  padding: 8px;
+  border-radius: 6px;
+}
+
 /* Section Result */
 .result-box {
   margin-top: 15px;
