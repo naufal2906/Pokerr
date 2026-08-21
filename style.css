@@ -18,7 +18,6 @@ body {
   box-sizing: border-box;
 }
 
-/* Outer RGB Glowing Border Effect */
 .rgb-card-container {
   position: relative;
   border-radius: 16px;
@@ -53,19 +52,43 @@ body {
   text-shadow: 0 0 10px var(--accent-color);
 }
 
-.symbols {
-  color: #ff0055;
-}
+.symbols { color: #ff0055; }
 
 .section {
   margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 h2 {
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: #a0aec0;
-  margin-bottom: 10px;
+  margin: 0;
 }
+
+.btn-add {
+  background: linear-gradient(45deg, #00f0ff, #0077ff);
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  border-radius: 15px;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+  transition: transform 0.2s;
+}
+
+.btn-add:hover { transform: scale(1.05); }
 
 .card-group {
   display: flex;
@@ -73,9 +96,9 @@ h2 {
   gap: 10px;
   flex-wrap: wrap;
   min-height: 85px;
+  margin-bottom: 8px;
 }
 
-/* Style Kartu Poker Modern */
 .card {
   width: 58px;
   height: 82px;
@@ -99,12 +122,20 @@ h2 {
   box-shadow: 0 0 15px var(--accent-color);
 }
 
+.card.empty-slot {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.5);
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
 .card.red { color: #e63946; }
 .card.black { color: #1d3557; }
 
-.sub-result {
-  margin-top: 8px;
-  font-size: 0.95rem;
+.eval-badge {
+  font-size: 0.9rem;
   color: #cbd5e1;
 }
 
@@ -113,26 +144,8 @@ h2 {
   font-weight: bold;
 }
 
-.btn-rgb {
-  background: linear-gradient(45deg, #7928ca, #ff0080);
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  font-size: 1rem;
-  font-weight: bold;
-  border-radius: 25px;
-  cursor: pointer;
-  box-shadow: 0 0 15px rgba(255, 0, 128, 0.4);
-  transition: all 0.3s ease;
-}
-
-.btn-rgb:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 25px rgba(255, 0, 128, 0.8);
-}
-
 .result-box {
-  margin-top: 25px;
+  margin-top: 15px;
   padding: 15px;
   background: rgba(0, 0, 0, 0.4);
   border-radius: 12px;
@@ -140,14 +153,13 @@ h2 {
 }
 
 .glow-text {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: bold;
   color: #ffbe0b;
   text-shadow: 0 0 8px #ffbe0b;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
-/* Modal Picker Kartu */
 .modal {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
