@@ -73,14 +73,24 @@ function updateEvaluation() {
     
     threats.forEach(t => {
       const div = document.createElement('div');
-      const isUp = t.indicator === '^';
-      div.className = `potential-item ${isUp ? 'safe' : ''}`;
+      let color = '#ff4d4d'; // Merah untuk (v)
+      let symbol = '▼';
+
+      if (t.indicator === '^') {
+        color = '#00ff87'; // Hijau untuk (^)
+        symbol = '▲';
+      } else if (t.indicator === '=') {
+        color = '#ffca28'; // Kuning untuk (=)
+        symbol = '〓';
+      }
+
+      div.className = `potential-item ${t.safe ? 'safe' : ''}`;
       div.innerHTML = `
-        <div style="font-weight:bold; font-size:1.05rem; margin-bottom:6px; color:${isUp ? '#00ff87' : '#ff4d4d'};">
-          ${isUp ? '▲' : '▼'} ${t.text}
+        <div style="font-weight:bold; font-size:1.05rem; margin-bottom:6px; color:${color};">
+          ${symbol} ${t.text} (${t.indicator})
         </div>
-        <div style="font-size:0.85rem; color:#00f2fe; margin-bottom:4px;">📊 <b>Potensi Meja:</b> ${t.boardPotential}</div>
-        <div style="font-size:0.85rem; color:${isUp ? '#00ff87' : '#ff4d4d'};">${t.worstCase}</div>
+        <div style="font-size:0.85rem; color:#00f2fe; margin-bottom:4px;">📊 <b>${t.boardPotential}</b></div>
+        <div style="font-size:0.85rem; color:${color};">${t.worstCase}</div>
       `;
       threatContainer.appendChild(div);
     });
