@@ -3,37 +3,28 @@ import { PokerEvaluator } from './evaluator.js';
 
 let currentHand = [];
 let currentCommunity = [];
-let activeSlot = { type: null, index: null };
 
-function createCardUI(card, onClick = null) {
+function createCardUI(card) {
   const cardDiv = document.createElement('div');
   cardDiv.className = `card ${card.suit.color}`;
   cardDiv.innerHTML = `
     <div>${card.rank.label}</div>
     <div style="text-align: center;">${card.suit.symbol}</div>
   `;
-  if (onClick) cardDiv.addEventListener('click', onClick);
-  return cardDiv;
-}
-
-function createEmptySlotUI(onClick) {
-  const cardDiv = document.createElement('div');
-  cardDiv.className = 'card empty-slot';
-  cardDiv.innerHTML = '+';
-  cardDiv.addEventListener('click', onClick);
   return cardDiv;
 }
 
 function updateEvaluation() {
-  // 1. Evaluasi Murni Kartu Tangan
+  // 1. Evaluasi Tangan
   document.getElementById('hand-only-result').innerText = 
     PokerEvaluator.evaluateHoleCards(currentHand);
 
-  // 2. Evaluasi Murni Kartu Komunitas
-  document.getElementById('community-only-result').innerText = 
-    PokerEvaluator.evaluatePartialCards(currentCommunity);
+  // 2. Persentase Kekuatan Kartu
+  const percentage = PokerEvaluator.calculateStrength(currentHand, currentCommunity);
+  document.getElementById('strength-bar').style.width = `${percentage}%`;
+  document.getElementById('strength-percent').innerText = `${percentage}%`;
 
-  // 3. Evaluasi Kombinasi Tertinggi Meja (Gabungan)
+  // 3. Kombinasi Tertinggi Meja
   const totalCards = [...currentHand, ...currentCommunity];
   const bestResult = PokerEvaluator.getBestHand(totalCards);
 
@@ -53,65 +44,39 @@ function renderBoard() {
   handContainer.innerHTML = '';
   commContainer.innerHTML = '';
 
-  // Render Kartu Tangan
-  currentHand.forEach((card, idx) => {
-    handContainer.appendChild(createCardUI(card, () => openPicker('hand', idx)));
-  });
-  if (currentHand.length < 2) {
-    handContainer.appendChild(createEmptySlotUI(() => openPicker('hand', currentHand.length)));
-  }
-
-  // Render Kartu Komunitas
-  currentCommunity.forEach((card, idx) => {
-    commContainer.appendChild(createCardUI(card, () => openPicker('community', idx)));
-  });
-  if (currentCommunity.length < 5) {
-    commContainer.appendChild(createEmptySlotUI(() => openPicker('community', currentCommunity.length)));
-  }
+  currentHand.forEach(card => handContainer.appendChild(createCardUI(card)));
+  currentCommunity.forEach(card => commContainer.appendChild(createCardUI(card)));
 
   updateEvaluation();
 }
 
-// Modal Picker System
-const modal = document.getElementById('card-picker-modal');
-const pickerGrid = document.getElementById('picker-grid');
-
-function openPicker(type, index) {
-  activeSlot = { type, index };
-  pickerGrid.innerHTML = '';
-
-  for (const suitKey in SUITS) {
-    for (const rank of RANKS) {
-      const card = new Card(rank, SUITS[suitKey]);
-      const cardUI = createCardUI(card, () => selectCard(card));
-      pickerGrid.appendChild(cardUI);
-    }
-  }
-  modal.classList.remove('hidden');
-}
-
-function selectCard(selectedCard) {
-  if (activeSlot.type === 'hand') {
-    currentHand[activeSlot.index] = selectedCard;
-  } else if (activeSlot.type === 'community') {
-    currentCommunity[activeSlot.index] = selectedCard;
-  }
-  modal.classList.add('hidden');
-  renderBoard();
-}
-
-// Tombol Tambah Kartu
+// Handler Tambah Kartu Tangan Inline
 document.getElementById('btn-add-hand').addEventListener('click', () => {
-  if (currentHand.length < 2) openPicker('hand', currentHand.length);
+  if (currentHand.length >= 2) return alert('Kartu tangan maksimal 2!');
+  const rankVal = Number(document.getElementById('hand-rank-select').value);
+  const suitKey = document.getElementById('hand-suit-select').value;
+
+  if (!rankVal || !suitKey) return alert('Pilih Nilai dan Simbol terlebih dahulu!');
+
+  const rank = RANKS.find(r => r.value === rankVal);
+  const suit = SUITS[suitKey];
+  currentHand.push(new Card(rank, suit));
+  renderBoard();
 });
 
+// Handler Tambah Kartu Komunitas Inline
 document.getElementById('btn-add-community').addEventListener('click', () => {
-  if (currentCommunity.length < 5) openPicker('community', currentCommunity.length);
+  if (currentCommunity.length >= 5) return alert('Kartu komunitas maksimal 5!');
+  const rankVal = Number(document.getElementById('comm-rank-select').value);
+  const suitKey = document.getElementById('comm-suit-select').value;
+
+  if (!rankVal || !suitKey) return alert('Pilih Nilai dan Simbol terlebih dahulu!');
+
+  const rank = RANKS.find(r => r.value === rankVal);
+  const suit = SUITS[suitKey];
+  currentCommunity.push(new Card(rank, suit));
+  renderBoard();
 });
 
-document.getElementById('close-modal').addEventListener('click', () => {
-  modal.classList.add('hidden');
-});
-
-// Inisialisasi Tampilan
+// Inisialisasi awal
 renderBoard();
