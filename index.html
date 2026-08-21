@@ -13,31 +13,38 @@
 
       <!-- Section Kartu Tangan -->
       <div class="section">
-        <h2>Kartu Tangan (Hole Cards)</h2>
+        <div class="section-header">
+          <h2>Kartu Tangan (Hole Cards)</h2>
+          <button id="btn-add-hand" class="btn-add">+ Kartu Tangan</button>
+        </div>
         <div id="hand-cards" class="card-group"></div>
-        <div class="sub-result">Kombinasi Tangan: <span id="hand-only-result" class="highlight">-</span></div>
+        <div class="eval-badge">
+          Kombinasi Kartu Tangan: <span id="hand-only-result" class="highlight">-</span>
+        </div>
       </div>
 
       <!-- Section Kartu Komunitas -->
       <div class="section">
-        <h2>Kartu Komunitas (Board)</h2>
+        <div class="section-header">
+          <h2>Kartu Komunitas (Board)</h2>
+          <button id="btn-add-community" class="btn-add">+ Kartu Komunitas</button>
+        </div>
         <div id="community-cards" class="card-group"></div>
+        <div class="eval-badge">
+          Kombinasi Kartu Komunitas: <span id="community-only-result" class="highlight">-</span>
+        </div>
       </div>
 
-      <div class="button-group">
-        <button id="btn-deal" class="btn btn-rgb">🎲 Kocok & Bagi Acak</button>
-      </div>
-
-      <!-- Section Hasil Akhir Combined -->
+      <!-- Section Hasil Akhir Gabungan -->
       <div class="result-box">
-        <h2>Kombinasi Tertinggi (Total 7 Kartu):</h2>
+        <h2>Kombinasi Tertinggi Meja:</h2>
         <div id="result-name" class="glow-text">-</div>
         <div id="best-cards" class="card-group"></div>
       </div>
     </div>
   </div>
 
-  <!-- Modal Pop-up untuk Memilih Kartu Manual -->
+  <!-- Modal Pop-up untuk Memilih Kartu -->
   <div id="card-picker-modal" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
