@@ -9,24 +9,7 @@ export class PokerEvaluator {
     return [...withHead, ...withoutHead];
   }
 
-  // Evaluasi khusus kombinasi yang sudah terbentuk saat ini (Made Hand)
-  static evaluateMadeHand(allCards) {
-    if (allCards.length === 0) return "-";
-    if (allCards.length < 5) {
-      // Jika kurang dari 5 kartu, cek Pair/Three of a Kind sederhana
-      const counts = {};
-      allCards.forEach(c => counts[c.rank.label] = (counts[c.rank.label] || 0) + 1);
-      const pairs = Object.entries(counts).filter(([_, count]) => count === 2);
-      const trips = Object.entries(counts).filter(([_, count]) => count === 3);
-
-      if (trips.length > 0) return `Three of a Kind (${trips[0][0]})`;
-      if (pairs.length === 2) return `Two Pair (${pairs[0][0]} & ${pairs[1][0]})`;
-      if (pairs.length === 1) return `One Pair (${pairs[0][0]})`;
-      return `High Card`;
-    }
-    return this.getBestHand(allCards).rankName;
-  }
-
+  // Evaluasi khusus 5 Kartu
   static evaluate5CardHand(cards) {
     const sorted = [...cards].sort((a, b) => b.rank.value - a.rank.value);
     const isFlush = sorted.every(c => c.suit.symbol === sorted[0].suit.symbol);
@@ -64,9 +47,23 @@ export class PokerEvaluator {
     return { rankName: 'High Card', score: 1, cards: sorted };
   }
 
-  static getBestHand(allCards) {
-    if (allCards.length < 5) return { rankName: 'Butuh minimal 5 kartu', cards: [] };
-    const combinations = this.getCombinations(allCards, 5);
+  // Cari Kombinasi 5 Kartu Terbaik dari sekumpulan kartu
+  static getBestHand(cards) {
+    if (cards.length < 5) {
+      if (cards.length === 0) return { rankName: '-', cards: [] };
+      // Evaluasi Parsial untuk kartu < 5
+      const counts = {};
+      cards.forEach(c => counts[c.rank.label] = (counts[c.rank.label] || 0) + 1);
+      const pairs = Object.entries(counts).filter(([_, count]) => count === 2);
+      const trips = Object.entries(counts).filter(([_, count]) => count === 3);
+
+      if (trips.length > 0) return { rankName: `Three of a Kind (${trips[0][0]})`, cards };
+      if (pairs.length === 2) return { rankName: `Two Pair (${pairs[0][0]} & ${pairs[1][0]})`, cards };
+      if (pairs.length === 1) return { rankName: `One Pair (${pairs[0][0]})`, cards };
+      return { rankName: 'High Card', cards };
+    }
+
+    const combinations = this.getCombinations(cards, 5);
     let bestHand = null;
 
     for (const combo of combinations) {
@@ -78,65 +75,83 @@ export class PokerEvaluator {
     return bestHand;
   }
 
-  // Menghitung potensi/perkiraan kombinasi yang bisa terbentuk (Draws & Out Prospects)
-  static detectPotentialDraws(handCards, communityCards) {
-    const total = [...handCards, ...communityCards];
-    if (total.length === 0) return ["Masukkan Kartu Tangan"];
+  // Mengevaluasi Khusus Kartu Komunitas Murni (Board Only)
+  static evaluateBoardOnly(communityCards) {
+    if (communityCards.length === 0) return "Belum ada kartu meja";
+    return this.getBestHand(communityCards).rankName;
+  }
 
-    const potentials = [];
+  // Mengecek Potensi Ancaman Kartu Meja Bagi Pemain Lain
+  static analyzeBoardThreats(communityCards) {
+    if (communityCards.length < 3) return [{ text: "Menunggu Flop (min 3 kartu meja)", safe: true }];
 
-    // Cek Potensi Flush (4 kartu lambang sama)
+    const threats = [];
+
+    // 1. Cek Potensi Flush di Meja
     const suitCounts = {};
-    total.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
-    Object.entries(suitCounts).forEach(([suit, count]) => {
-      if (count === 4) potentials.push(`♠♥♣♦ Flush Draw (Butuh 1 kartu ${suit} lagi)`);
-      if (count === 3 && total.length < 5) potentials.push(`♠♥♣♦ Backdoor Flush Potential (${suit})`);
-    });
-
-    // Cek Potensi Pair / Sets / Full House
-    const rankCounts = {};
-    total.forEach(c => rankCounts[c.rank.label] = (rankCounts[c.rank.label] || 0) + 1);
+    communityCards.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
     
-    let pairCount = 0;
-    let tripCount = 0;
-    Object.values(rankCounts).forEach(cnt => {
-      if (cnt === 2) pairCount++;
-      if (cnt === 3) tripCount++;
+    Object.entries(suitCounts).forEach(([suit, count]) => {
+      if (count >= 5) {
+        threats.push({ text: `⚠️ WARNING: Meja sudah membentuk FLUSH (${suit})!`, safe: false });
+      } else if (count === 4) {
+        threats.push({ text: `⚠️ Ancaman Flush Tinggi! Ada 4 kartu ${suit} di meja.`, safe: false });
+      } else if (count === 3) {
+        threats.push({ text: `⚡ Potensi Flush: Ada 3 kartu ${suit} di meja.`, safe: true });
+      }
     });
 
-    if (tripCount > 0) potentials.push("🔥 Potensi Full House / Four of a Kind");
-    else if (pairCount >= 2) potentials.push("⚡ Potensi Full House");
-    else if (pairCount === 1) potentials.push("📈 Potensi Three of a Kind / Two Pair");
+    // 2. Cek Potensi Pair / Full House di Meja
+    const rankCounts = {};
+    communityCards.forEach(c => rankCounts[c.rank.label] = (rankCounts[c.rank.label] || 0) + 1);
+    
+    let pairs = 0, trips = 0;
+    Object.values(rankCounts).forEach(cnt => {
+      if (cnt === 2) pairs++;
+      if (cnt === 3) trips++;
+    });
 
-    // Cek Potensi Straight
-    const uniqueValues = [...new Set(total.map(c => c.rank.value))].sort((a,b) => a - b);
-    if (uniqueValues.length >= 4) {
-      for (let i = 0; i <= uniqueValues.length - 4; i++) {
-        if (uniqueValues[i+3] - uniqueValues[i] <= 4) {
-          potentials.push("🎯 Straight Draw (Potensi Straight)");
+    if (trips > 0 || pairs >= 2) {
+      threats.push({ text: `⚠️ Ancaman Full House / Four of a Kind di meja!`, safe: false });
+    } else if (pairs === 1) {
+      threats.push({ text: `⚡ Ada Pair di meja (Potensi Trips/Full House lawan).`, safe: true });
+    }
+
+    // 3. Cek Potensi Straight di Meja
+    const values = [...new Set(communityCards.map(c => c.rank.value))].sort((a,b) => a - b);
+    if (values.length >= 3) {
+      let straightPotential = false;
+      for (let i = 0; i <= values.length - 3; i++) {
+        if (values[i+2] - values[i] <= 4) {
+          straightPotential = true;
           break;
         }
       }
+      if (straightPotential) {
+        threats.push({ text: `🎯 Ancaman Straight: Kartu meja saling bersambungan.`, safe: true });
+      }
     }
 
-    if (potentials.length === 0) potentials.push("Tidak ada potensi draw khusus (High Card / Pair)");
+    if (threats.length === 0) {
+      threats.push({ text: "✅ Meja relatif aman (Dry Board / Tidak ada koneksi kuat).", safe: true });
+    }
 
-    return potentials;
+    return threats;
   }
 
-  // Kalkulasi persentase kekuatan kartu berdasarkan kombinasi aktif & potensi
+  // Kalkulasi Win Equity Kartu Tangan Anda
   static calculateStrength(handCards, communityCards) {
     if (handCards.length === 0) return 0;
     const total = [...handCards, ...communityCards];
 
     if (total.length < 5) {
       let equity = 30;
-      if (handCards.length === 2 && handCards[0].rank.value === handCards[1].rank.value) equity += 40;
+      if (handCards.length === 2 && handCards[0].rank.value === handCards[1].rank.value) equity += 35;
       if (communityCards.length > 0) {
-        const made = this.evaluateMadeHand(total);
-        if (made.includes('One Pair')) equity += 25;
-        if (made.includes('Two Pair')) equity += 45;
-        if (made.includes('Three of a Kind')) equity += 55;
+        const myHand = this.getBestHand(total).rankName;
+        if (myHand.includes('One Pair')) equity += 20;
+        if (myHand.includes('Two Pair')) equity += 40;
+        if (myHand.includes('Three of a Kind')) equity += 55;
       }
       return Math.min(equity, 100);
     } else {
