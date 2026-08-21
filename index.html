@@ -17,9 +17,9 @@
           <h2>Kartu Tangan Anda (Hole Cards)</h2>
           <div class="btn-actions">
             <button id="btn-clear-hand" class="btn-clear">Reset</button>
-            <button id="btn-open-hand" class="btn-add">+ Tangan</button>
           </div>
         </div>
+        <!-- 2 Slot Kartu Tangan -->
         <div id="hand-cards" class="card-group"></div>
         
         <div class="status-box">
@@ -41,9 +41,9 @@
           <h2>Kartu Komunitas (Board)</h2>
           <div class="btn-actions">
             <button id="btn-clear-comm" class="btn-clear">Reset</button>
-            <button id="btn-open-comm" class="btn-add">+ Komunitas</button>
           </div>
         </div>
+        <!-- 5 Slot Kartu Komunitas -->
         <div id="community-cards" class="card-group"></div>
       </div>
 
@@ -54,14 +54,14 @@
 
         <hr class="divider">
 
-        <h2>Kombinasi Final 5 Kartu Terbaik Anda:</h2>
+        <h2>Kombinasi Final Terbaik saat Ini:</h2>
         <div id="result-name" class="glow-text">-</div>
         <div id="best-cards" class="card-group"></div>
       </div>
     </div>
   </div>
 
-  <!-- Modal Picker (Simbol -> Nilai) -->
+  <!-- Modal Picker 4 Baris Simbol (Instant Selection) -->
   <div id="card-picker-modal" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
@@ -69,20 +69,8 @@
         <span id="close-modal" class="close-btn">&times;</span>
       </div>
       
-      <div class="picker-step">
-        <label>1. Pilih Simbol:</label>
-        <div class="suit-selector">
-          <button class="btn-suit black" data-suit="SPADES">♠ Sekop</button>
-          <button class="btn-suit red" data-suit="HEARTS">♥ Hati</button>
-          <button class="btn-suit black" data-suit="CLUBS">♣ Keriting</button>
-          <button class="btn-suit red" data-suit="DIAMONDS">♦ Wajik</button>
-        </div>
-      </div>
-
-      <div id="rank-step" class="picker-step hidden">
-        <label>2. Pilih Nilai Kartu:</label>
-        <div id="rank-grid" class="rank-grid"></div>
-      </div>
+      <!-- Grid 4 Baris Simbol -->
+      <div id="full-card-grid" class="full-card-grid"></div>
     </div>
   </div>
 
