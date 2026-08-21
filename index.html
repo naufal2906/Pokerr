@@ -15,7 +15,10 @@
       <div class="section">
         <div class="section-header">
           <h2>Kartu Tangan Anda (Hole Cards)</h2>
-          <button id="btn-open-hand" class="btn-add">+ Tangan</button>
+          <div class="btn-actions">
+            <button id="btn-clear-hand" class="btn-clear">Reset</button>
+            <button id="btn-open-hand" class="btn-add">+ Tangan</button>
+          </div>
         </div>
         <div id="hand-cards" class="card-group"></div>
         
@@ -35,21 +38,18 @@
       <div class="section">
         <div class="section-header">
           <h2>Kartu Komunitas (Board)</h2>
-          <button id="btn-open-comm" class="btn-add">+ Komunitas</button>
+          <div class="btn-actions">
+            <button id="btn-clear-comm" class="btn-clear">Reset</button>
+            <button id="btn-open-comm" class="btn-add">+ Komunitas</button>
+          </div>
         </div>
         <div id="community-cards" class="card-group"></div>
-        
-        <div class="status-box board-status">
-          <div>Kombinasi Murni Meja: <span id="board-only-hand" class="highlight-yellow">-</span></div>
-        </div>
       </div>
 
-      <!-- Section Analisis Potensi & Ancaman Meja -->
+      <!-- Section Analisis Potensi & Counter Kartu Terkuat -->
       <div class="result-box">
-        <h2>Analisis Potensi & Ancaman Meja (Board Threat):</h2>
-        <div id="board-threats" class="potential-list">
-          <!-- Peringatan potensi flush/straight/full house lawan akan tampil di sini -->
-        </div>
+        <h2>Analisis Potensi & Counter Kartu Terkuat (The Nuts):</h2>
+        <div id="board-threats" class="potential-list"></div>
 
         <hr class="divider">
 
@@ -88,3 +88,4 @@
   <script type="module" src="app.js"></script>
 </body>
 </html>
+p
