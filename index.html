@@ -3,85 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Poker Evaluator & Strategy</title>
+  <title>Poker Evaluator</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="app-container">
-    <header>
-      <h1>POKER EVALUATOR</h1>
-      <p class="subtitle">♠♥♣♦ Smart Decision Helper</p>
+    <header class="main-header">
+      <h1 class="glow-title">POKER EVALUATOR</h1>
+      <div class="suits-decor">♠<span class="red">♥</span>♣<span class="red">♦</span></div>
     </header>
 
-    <!-- Kartu Tangan -->
-    <section class="card-section">
-      <div class="section-header">
-        <h2>Kartu Tangan Anda (Hole Cards)</h2>
-        <button id="btn-clear-hand" class="btn-reset">Reset</button>
-      </div>
-      <div id="hand-cards" class="cards-grid hole-grid"></div>
-      
-      <div class="hand-analysis-box">
-        <div>Kombinasi Kartu Tangan: <span id="hole-only-hand" class="highlight-text">-</span></div>
-        <div>Kombinasi Tangan + Meja: <span id="my-best-hand" class="highlight-text">-</span></div>
-        <div class="strength-container">
-          <span>Win Equity:</span>
-          <div class="bar-wrapper">
-            <div id="strength-bar" class="bar-fill"></div>
+    <main class="dashboard">
+      <!-- SECTION 1: KARTU TANGAN -->
+      <section class="panel-card">
+        <div class="panel-header">
+          <h2>Kartu Tangan Anda (Hole Cards)</h2>
+          <button id="btn-clear-hand" class="btn-reset">Reset</button>
+        </div>
+        <div id="hand-cards" class="cards-slot-container hole-slots"></div>
+        <div class="hand-summary-box">
+          <p>Kombinasi Kartu Tangan: <strong id="hole-only-hand" class="text-cyan">-</strong></p>
+          <p>Kombinasi Tangan + Meja: <strong id="my-best-hand" class="text-green">-</strong></p>
+          <div class="equity-wrapper">
+            <span>Win Equity:</span>
+            <div class="equity-bar-bg">
+              <div id="strength-bar" class="equity-bar-fill"></div>
+            </div>
+            <strong id="strength-percent">0%</strong>
           </div>
-          <span id="strength-percent">0%</span>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Kartu Komunitas -->
-    <section class="card-section">
-      <div class="section-header">
-        <h2>Kartu Komunitas (Board)</h2>
-        <button id="btn-clear-comm" class="btn-reset">Reset</button>
-      </div>
-      <div id="community-cards" class="cards-grid community-grid"></div>
-    </section>
-
-    <!-- Saran Strategi (Blind 300 / 600) -->
-    <section class="strategy-section">
-      <h3>Saran Strategi & Betting (Blind 300/600)</h3>
-      <div class="strategy-details">
-        <div class="strat-row">
-          <span>Rekomendasi Aksi:</span>
-          <span id="strat-action" class="badge-action">WAIT</span>
+      <!-- SECTION 2: KARTU KOMUNITAS -->
+      <section class="panel-card">
+        <div class="panel-header">
+          <h2>Kartu Komunitas (Board)</h2>
+          <button id="btn-clear-comm" class="btn-reset">Reset</button>
         </div>
-        <div class="strat-row">
-          <span>Estimasi Size Bet:</span>
-          <span id="strat-amount" class="amount-text">0 Chips</span>
-        </div>
-        <div id="strat-reason" class="reason-box">
-          Pilih 2 Kartu Tangan Terlebih Dahulu.
-        </div>
-      </div>
-    </section>
+        <div id="community-cards" class="cards-slot-container comm-slots"></div>
+      </section>
 
-    <!-- Analisis Ancaman & The Nuts -->
-    <section class="threat-section">
-      <h3>Analisis Potensi & Counter Kartu Terkuat (The Nuts):</h3>
-      <div id="board-threats" class="threat-container"></div>
+      <!-- SECTION 3: STRATEGI & BETTING -->
+      <section class="panel-card strategy-card">
+        <h2>Saran Strategi & Betting (Blind 300/600)</h2>
+        <div class="strategy-body">
+          <div class="strat-row">
+            <span>Rekomendasi Aksi:</span>
+            <span id="strat-action" class="action-badge badge-wait">WAIT</span>
+          </div>
+          <div class="strat-row">
+            <span>Estimasi Size Bet:</span>
+            <strong id="strat-amount" class="amount-gold">0 Chips</strong>
+          </div>
+          <div id="strat-reason" class="reason-note">
+            Pilih 2 Kartu Tangan Terlebih Dahulu.
+          </div>
+        </div>
+      </section>
 
-      <div class="best-combination-box">
-        <p>Kombinasi Final Terbaik saat Ini:</p>
-        <h2 id="result-name" class="result-title">-</h2>
-        <div id="best-cards" class="cards-grid best-grid"></div>
-      </div>
-    </section>
+      <!-- SECTION 4: ANALISIS POTENSI & COUNTER -->
+      <section class="panel-card threat-card">
+        <h3>Analisis Potensi & Counter Kartu Terkuat (The Nuts):</h3>
+        <div id="board-threats" class="threat-list"></div>
+
+        <div class="best-combination-display">
+          <p class="sub-label">Kombinasi Final Terbaik saat Ini:</p>
+          <h2 id="result-name" class="best-hand-title">-</h2>
+          <div id="best-cards" class="cards-slot-container best-slots"></div>
+        </div>
+      </section>
+    </main>
   </div>
 
-  <!-- Modal Selector Kartu -->
-  <div id="card-picker-modal" class="modal hidden">
+  <!-- MODAL SELECTION -->
+  <div id="card-picker-modal" class="modal-overlay hidden">
     <div class="modal-content">
       <div class="modal-header">
         <h3>Pilih Kartu (<span id="target-label">Slot</span>)</h3>
-        <button id="close-modal" class="btn-close">&times;</button>
+        <button id="close-modal" class="btn-close-modal">&times;</button>
       </div>
-      <div id="full-card-grid" class="picker-grid"></div>
+      <div id="full-card-grid" class="picker-body"></div>
     </div>
   </div>
 
