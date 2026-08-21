@@ -2,13 +2,12 @@ export class PokerEvaluator {
   static RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   static SUITS = ['♠', '♥', '♦', '♣'];
 
-  // Helper untuk memfilter hanya kartu yang valid
   static getValidCards(cards) {
     if (!Array.isArray(cards)) return [];
     return cards.filter(c => c && c.rank && typeof c.rank.value === 'number' && c.suit);
   }
 
-  // 1. Method Khusus Evaluasi 2 Kartu Tangan Murni (Diperlukan oleh app.js)
+  // Evaluasi 2 Kartu Tangan Murni
   static evaluateHoleCardsOnly(handCards) {
     const valid = this.getValidCards(handCards);
     if (valid.length < 2) return "-";
@@ -22,12 +21,134 @@ export class PokerEvaluator {
 
     const highCard = c1.rank.value > c2.rank.value ? c1.rank.label : c2.rank.label;
     const isSuited = c1.suit.symbol === c2.suit.symbol;
-    const suitedText = isSuited ? "Suited" : "Offsuit";
-
-    return `High Card ${highCard} (${suitedText})`;
+    return `High Card ${highCard} (${isSuited ? "Suited" : "Offsuit"})`;
   }
 
-  // 2. Evaluasi Kombinasi Kartu Terbaik
+  // Deteksi Detil Kurang 1 Kartu untuk 7 Kombinasi
+  static detectDraws(cards) {
+    const validCards = this.getValidCards(cards);
+    if (validCards.length < 3) return null;
+
+    const suitNames = { '♣': 'Keriting', '♠': 'Sekop', '♥': 'Hati', '♦': 'Diamond' };
+    const labelMap = { 14: 'As', 13: 'King', 12: 'Queen', 11: 'Jack', 10: '10', 9: '9', 8: '8', 7: '7', 6: '6', 5: '5', 4: '4', 3: '3', 2: '2' };
+
+    const straightWindows = [
+      { window: [14, 2, 3, 4, 5], isRoyal: false },
+      { window: [2, 3, 4, 5, 6], isRoyal: false },
+      { window: [3, 4, 5, 6, 7], isRoyal: false },
+      { window: [4, 5, 6, 7, 8], isRoyal: false },
+      { window: [5, 6, 7, 8, 9], isRoyal: false },
+      { window: [6, 7, 8, 9, 10], isRoyal: false },
+      { window: [7, 8, 9, 10, 11], isRoyal: false },
+      { window: [8, 9, 10, 11, 12], isRoyal: false },
+      { window: [9, 10, 11, 12, 13], isRoyal: false },
+      { window: [10, 11, 12, 13, 14], isRoyal: true }
+    ];
+
+    const draws = [];
+
+    // Grouping kartu berdasarkan simbol/suit
+    const cardsBySuit = {};
+    validCards.forEach(c => {
+      const symbol = c.suit.symbol;
+      if (!cardsBySuit[symbol]) cardsBySuit[symbol] = [];
+      cardsBySuit[symbol].push(c);
+    });
+
+    // 1. ROYAL FLUSH & STRAIGHT FLUSH DRAW (Angka + Simbol Khusus)
+    for (const [symbol, sCards] of Object.entries(cardsBySuit)) {
+      if (sCards.length >= 4) {
+        const sRankSet = new Set(sCards.map(c => c.rank.value));
+
+        for (const sw of straightWindows) {
+          const matchRanks = sw.window.filter(r => sRankSet.has(r));
+          if (matchRanks.length === 4) {
+            const missingRank = sw.window.find(r => !sRankSet.has(r));
+            const isRoyal = sw.isRoyal;
+            const drawType = isRoyal ? "ROYAL FLUSH DRAW" : "STRAIGHT FLUSH DRAW";
+            const suitText = suitNames[symbol] || symbol;
+
+            draws.push({
+              type: isRoyal ? 'ROYAL_FLUSH_DRAW' : 'STRAIGHT_FLUSH_DRAW',
+              text: `${drawType}`,
+              needed: `SANGAT KRUSIAL! Butuh Khusus Kartu ${labelMap[missingRank]} ${suitText} (Untuk ${isRoyal ? 'ROYAL FLUSH' : 'STRAIGHT FLUSH'})`
+            });
+            return draws;
+          }
+        }
+      }
+    }
+
+    // Perhitungan Jumlah Kembar (Rank Counts)
+    const counts = {};
+    validCards.forEach(c => counts[c.rank.value] = (counts[c.rank.value] || 0) + 1);
+    const pairs = Object.keys(counts).filter(r => counts[r] === 2);
+    const trips = Object.keys(counts).filter(r => counts[r] === 3);
+
+    // 2. FOUR OF A KIND DRAW (Sudah Trips/Set, kurang 1 lagi untuk Quads)
+    if (trips.length > 0) {
+      const tripRank = trips[0];
+      draws.push({
+        type: 'QUADS_DRAW',
+        text: 'Four of a Kind Draw',
+        needed: `Butuh 1 Kartu ${labelMap[tripRank]} lagi (Simbol Bebas) untuk Four of a Kind`
+      });
+    }
+
+    // 3. FULL HOUSE DRAW (Dua Pair butuh 1 kartu kembar ke Trips, ATAU Trips butuh Pair)
+    if (pairs.length >= 2 && trips.length === 0) {
+      const pairNames = pairs.map(r => labelMap[r]).join(" / ");
+      draws.push({
+        type: 'FULL_HOUSE_DRAW',
+        text: 'Full House Draw',
+        needed: `Butuh 1 Kartu ${pairNames} (Simbol Bebas) untuk Full House`
+      });
+    }
+
+    // 4. FLUSH DRAW (4 kartu warna sama, butuh 1 kartu simbol tertentu)
+    const suitCounts = {};
+    validCards.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
+
+    for (const [suitSymbol, count] of Object.entries(suitCounts)) {
+      if (count === 4) {
+        draws.push({
+          type: 'FLUSH_DRAW',
+          text: `Flush Draw (${suitNames[suitSymbol] || suitSymbol})`,
+          needed: `Butuh 1 Kartu ${suitNames[suitSymbol] || suitSymbol} (Angka Bebas)`
+        });
+      }
+    }
+
+    // 5. STRAIGHT DRAW (4 kartu urut, butuh 1 angka tertentu)
+    const rankSet = new Set(validCards.map(c => c.rank.value));
+    for (const sw of straightWindows) {
+      const matchRanks = sw.window.filter(r => rankSet.has(r));
+      if (matchRanks.length === 4) {
+        const missingRank = sw.window.find(r => !rankSet.has(r));
+        draws.push({
+          type: 'STRAIGHT_DRAW',
+          text: 'Straight Draw',
+          missingRankValue: missingRank,
+          needed: `Butuh Kartu ${labelMap[missingRank]} (Simbol Bebas)`
+        });
+        break; 
+      }
+    }
+
+    // 6. THREE OF A KIND DRAW (Sudah One Pair, butuh 1 kartu bernilai sama)
+    if (pairs.length === 1 && trips.length === 0 && draws.length === 0) {
+      const pairRank = pairs[0];
+      draws.push({
+        type: 'TRIPS_DRAW',
+        text: 'Three of a Kind Draw',
+        needed: `Butuh 1 Kartu ${labelMap[pairRank]} lagi (Simbol Bebas) untuk Three of a Kind`
+      });
+    }
+
+    return draws.length > 0 ? draws : null;
+  }
+
+  // Kombinasi Kartu Terbaik
   static getBestHand(cards) {
     const validCards = this.getValidCards(cards);
 
@@ -37,10 +158,17 @@ export class PokerEvaluator {
 
     if (validCards.length < 5) {
       const subResult = this.evaluateSubset(validCards);
+      const draws = this.detectDraws(validCards);
+      let rankText = subResult.rankName;
+      if (draws && draws.length > 0) {
+        rankText += ` [${draws.map(d => d.needed).join(' & ')}]`;
+      }
+
       return {
         score: subResult.score,
-        rankName: subResult.rankName,
-        cards: validCards
+        rankName: rankText,
+        cards: validCards,
+        draws: draws
       };
     }
 
@@ -58,17 +186,15 @@ export class PokerEvaluator {
       }
     }
 
-    // Deteksi Teks Straight Draw jika kombinasi belum jadi Straight
-    const ranks = [...new Set(validCards.map(c => c.rank.value))].sort((a, b) => a - b);
-    const drawText = this.checkStraightDrawNeeded(ranks);
-    if (drawText && bestHand.score < 5) {
-      bestHand.rankName += ` (${drawText})`;
+    const draws = this.detectDraws(validCards);
+    if (draws && bestHand.score < 5) {
+      bestHand.rankName += ` [${draws.map(d => d.needed).join(' & ')}]`;
     }
+    bestHand.draws = draws;
 
     return bestHand;
   }
 
-  // Evaluasi Subset (< 5 Kartu)
   static evaluateSubset(cards) {
     const validCards = this.getValidCards(cards);
     if (validCards.length === 0) return { score: 0, rankName: "-" };
@@ -88,7 +214,6 @@ export class PokerEvaluator {
     return { score: 1, rankName: "High Card" };
   }
 
-  // Evaluasi 5 Kartu Murni
   static evaluate5CardHand(cards) {
     const validCards = this.getValidCards(cards);
     if (validCards.length < 5) return { score: 0, rankName: "-" };
@@ -100,10 +225,13 @@ export class PokerEvaluator {
     if (ranks[4] - ranks[0] === 4 && new Set(ranks).size === 5) {
       isStraight = true;
     } else if (ranks[4] === 14 && ranks[0] === 2 && ranks[1] === 3 && ranks[2] === 4 && ranks[3] === 5) {
-      isStraight = true; // Wheel Straight (A-2-3-4-5)
+      isStraight = true;
     }
 
-    if (isFlush && isStraight) return { score: 9, rankName: "Straight Flush" };
+    if (isFlush && isStraight) {
+      if (ranks[0] === 10 && ranks[4] === 14) return { score: 10, rankName: "Royal Flush" };
+      return { score: 9, rankName: "Straight Flush" };
+    }
 
     const counts = {};
     ranks.forEach(r => counts[r] = (counts[r] || 0) + 1);
@@ -120,27 +248,6 @@ export class PokerEvaluator {
     return { score: 1, rankName: "High Card" };
   }
 
-  // Deteksi Teks Kartu Penyambung Straight (A/9 dll)
-  static checkStraightDrawNeeded(ranks) {
-    if (!Array.isArray(ranks)) return null;
-    const rankSet = new Set(ranks);
-    const needed = [];
-
-    if (rankSet.has(10) && rankSet.has(11) && rankSet.has(12) && rankSet.has(13)) {
-      if (!rankSet.has(14)) needed.push("As");
-      if (!rankSet.has(9)) needed.push("9");
-    } else if (rankSet.has(9) && rankSet.has(10) && rankSet.has(11) && rankSet.has(12)) {
-      if (!rankSet.has(13)) needed.push("King");
-      if (!rankSet.has(8)) needed.push("8");
-    }
-
-    if (needed.length > 0) {
-      return `Butuh Kartu ${needed.join(" atau ")}`;
-    }
-    return null;
-  }
-
-  // Helper Kombinasi
   static getCombinations(arr, k) {
     if (k === 0 || arr.length < k) return [[]];
     if (k === arr.length) return [arr];
@@ -150,7 +257,6 @@ export class PokerEvaluator {
     return [...withFirst, ...withoutFirst];
   }
 
-  // Analisis Ancaman Meja
   static analyzeBoardThreats(communityCards) {
     const threats = [];
     const validComm = this.getValidCards(communityCards);
@@ -179,7 +285,6 @@ export class PokerEvaluator {
     return threats;
   }
 
-  // Hitung Estimasi Win Equity Sederhana
   static calculateStrength(handCards, communityCards) {
     const activeHand = this.getValidCards(handCards);
     const activeComm = this.getValidCards(communityCards);
@@ -195,9 +300,17 @@ export class PokerEvaluator {
       return high >= 11 ? 55 : 35;
     }
 
+    if (best.draws && best.draws.length > 0) {
+      const isRoyalOrSF = best.draws.some(d => d.type === 'ROYAL_FLUSH_DRAW' || d.type === 'STRAIGHT_FLUSH_DRAW');
+      const isQuadsOrFH = best.draws.some(d => d.type === 'QUADS_DRAW' || d.type === 'FULL_HOUSE_DRAW');
+      if (isRoyalOrSF) return 75;
+      if (isQuadsOrFH) return 65;
+      return 50;
+    }
+
     if (best.score >= 5) return 85;
     if (best.score >= 3) return 65;
     if (best.score === 2) return 45;
-    return 20;
+    return 25;
   }
 }
