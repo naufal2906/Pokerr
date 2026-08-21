@@ -10,7 +10,6 @@ export class PokerEvaluator {
     const comm = this.getValidCards(communityCards);
     if (comm.length < 3) return { hasFlushThreat: false, highestThreat: "-" };
 
-    // Hitung jumlah suit
     const suitCounts = {};
     comm.forEach(c => {
       const s = c.suit.symbol || c.suit;
@@ -30,19 +29,20 @@ export class PokerEvaluator {
     return { hasFlushThreat, highestThreat };
   }
 
-  // ANALISIS ANCAMAN MEJA & COUNTER KARTU TERKUAT (THE NUTS)
+  // ANALISIS ANCAMAN MEJA SPESIFIK & COUNTER KARTU TERKUAT (THE NUTS)
   static analyzeBoardThreats(communityCards) {
     const comm = this.getValidCards(communityCards);
     if (comm.length < 3) return [{ text: "Menunggu Flop (Minimal 3 Kartu Komunitas)", safe: true }];
 
     const threats = [];
-    const ranks = comm.map(c => c.rank.value).sort((a, b) => b - a); // Urutkan terbesar ke terkecil
-    const maxRank = ranks[0];
+    const ranks = comm.map(c => c.rank.value).sort((a, b) => b - a);
 
-    // Hitung Kemunculan Rank (Deteksi Pair di Meja)
+    // Hitung Kemunculan Rank
     const rankCounts = {};
     ranks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
-    const hasBoardPair = Object.values(rankCounts).some(cnt => cnt >= 2);
+    
+    const pairedRanks = Object.keys(rankCounts).filter(r => rankCounts[r] >= 2).map(Number);
+    const hasBoardPair = pairedRanks.length > 0;
 
     // Hitung Kemunculan Suit
     const suitCounts = {};
@@ -52,39 +52,39 @@ export class PokerEvaluator {
     });
     const maxSuitCount = Math.max(...Object.values(suitCounts), 0);
 
-    // 1. ANCAMAN FLUSH
+    // 1. ANCAMAN PAIR DI MEJA (Three of a Kind / Full House / Quads)
+    if (hasBoardPair) {
+      const pairedLabel = pairedRanks.map(r => r === 14 ? 'As' : r === 13 ? 'King' : r === 12 ? 'Queen' : r === 11 ? 'Jack' : r).join(', ');
+      threats.push({
+        text: `⚠️ Meja Ada Pair (${pairedLabel})! Lawan berpotensi dapat Three of a Kind / Full House`,
+        nutText: `Kartu Lawan yang Bikin Kalah: Memegang Kartu [${pairedLabel}] (Jadi Trip/Quads) atau [Kartu Pasangan Meja]`,
+        safe: false
+      });
+    }
+
+    // 2. ANCAMAN FLUSH
     if (maxSuitCount >= 3) {
       threats.push({
         text: `⚠️ Papan Rawan Flush (${maxSuitCount} Kartu Sejenis)`,
-        nutText: "Counter Terkuat: Flush As (Nut Flush)",
+        nutText: "Kartu Lawan yang Bikin Kalah: Memegang 2 Kartu dengan Simbol Sejenis",
         safe: false
       });
     }
 
-    // 2. ANCAMAN FULL HOUSE / QUADS (Jika ada Pair di Meja)
-    if (hasBoardPair) {
-      threats.push({
-        text: "⚠️ Papan Berpasangan (Board Paired)",
-        nutText: "Counter Terkuat: Full House / Quads",
-        safe: false
-      });
-    }
-
-    // 3. ANCAMAN HIGH CARDS / OVERCARDS (King / Queen / Ace di Meja)
-    if (maxRank >= 12 && !hasBoardPair && maxSuitCount < 3) { // Q = 12, K = 13, A = 14
-      const highLabel = maxRank === 14 ? 'As' : maxRank === 13 ? 'King' : 'Queen';
+    // 3. ANCAMAN OVERCARDS / KARTU TINGGI (Jika tidak ada pair)
+    if (!hasBoardPair && ranks[0] >= 12 && maxSuitCount < 3) {
+      const highLabel = ranks[0] === 14 ? 'As' : ranks[0] === 13 ? 'King' : 'Queen';
       threats.push({
         text: `⚠️ Ada Kartu Tinggi (${highLabel}) di Meja`,
-        nutText: `Counter Terkuat: Set (${highLabel}s) / Two Pair (${ranks[0] > 12 ? 'K-Q' : 'Q-J'})`,
+        nutText: `Kartu Lawan yang Bikin Kalah: Memegang Kartu [${highLabel}] / Set`,
         safe: false
       });
     }
 
-    // Jika Meja Sangat Aman (Tidak ada Flush, tidak ada Pair, tidak ada Straight Draw)
     if (threats.length === 0) {
       threats.push({
         text: "Papan Relatif Aman (Tidak Ada Ancaman Flush/Pair Besar)",
-        nutText: `Kartu Terkuat (The Nuts): Set / Three of a Kind (${ranks[0]}s)`,
+        nutText: `Kartu Terkuat (The Nuts): Set / Three of a Kind`,
         safe: true
       });
     }
@@ -99,7 +99,6 @@ export class PokerEvaluator {
       return { score: 0, rankName: "Pilih Kartu Tangan", cards: [], draws: [] };
     }
 
-    // Hitung Frekuensi Rank
     const rankCounts = {};
     const suitCounts = {};
     valid.forEach(c => {
@@ -111,13 +110,13 @@ export class PokerEvaluator {
     const uniqueRanks = Object.keys(rankCounts).map(Number).sort((a, b) => b - a);
     const sortedCards = [...valid].sort((a, b) => b.rank.value - a.rank.value);
 
-    // Deteksi Flush
+    const activeComm = valid.length > 2 ? valid.slice(2) : [];
+
     let flushSuit = null;
     Object.keys(suitCounts).forEach(s => {
       if (suitCounts[s] >= 5) flushSuit = s;
     });
 
-    // 1. Full House / Three of a Kind / Pairs
     const trips = uniqueRanks.filter(r => rankCounts[r] === 3);
     const pairs = uniqueRanks.filter(r => rankCounts[r] === 2);
 
@@ -135,18 +134,19 @@ export class PokerEvaluator {
     }
 
     if (pairs.length >= 2) {
-      return { score: 3, rankName: "Two Pair", cards: sortedCards.slice(0, 5), draws: [] };
+      const draws = [];
+      // HANYA tampilkan teks butuh kartu jika babak BELUM River (< 5 kartu meja)
+      if (activeComm.length > 0 && activeComm.length < 5) {
+        draws.push({ text: "Full House", needed: "Butuh Kartu Penguat di Turn/River" });
+      }
+      return { score: 3, rankName: "Two Pair", cards: sortedCards.slice(0, 5), draws };
     }
 
     if (pairs.length === 1) {
-      // Deteksi Draw HANYA jika kartu meja kurang dari 5 (Sebelum River)
       const draws = [];
-      const commCards = valid.length > 2 ? valid.slice(2) : [];
-      
-      if (commCards.length > 0 && commCards.length < 5) {
+      if (activeComm.length > 0 && activeComm.length < 5) {
         draws.push({ text: "Two Pair / Three of a Kind", needed: "Butuh Kartu Penguat di Turn/River" });
       }
-
       return { score: 2, rankName: "One Pair", cards: sortedCards.slice(0, 5), draws };
     }
 
