@@ -9,6 +9,16 @@ export class PokerEvaluator {
     return [...withHead, ...withoutHead];
   }
 
+  // Evaluasi khusus 2 kartu di tangan
+  static evaluateHoleCards(cards) {
+    if (cards.length < 2) return "Pilih 2 Kartu";
+    if (cards[0].rank.value === cards[1].rank.value) {
+      return `One Pair (${cards[0].rank.label})`;
+    }
+    const high = cards[0].rank.value > cards[1].rank.value ? cards[0] : cards[1];
+    return `High Card (${high.rank.label})`;
+  }
+
   static evaluate5CardHand(cards) {
     const sorted = [...cards].sort((a, b) => b.rank.value - a.rank.value);
     const isFlush = sorted.every(c => c.suit.symbol === sorted[0].suit.symbol);
@@ -47,6 +57,9 @@ export class PokerEvaluator {
   }
 
   static getBestHand(allCards) {
+    if (allCards.length < 5) {
+      return { rankName: 'Minimal 5 Kartu Aktif', cards: allCards };
+    }
     const combinations = this.getCombinations(allCards, 5);
     let bestHand = null;
 
