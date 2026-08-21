@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Poker Evaluator RGB Pro</title>
+  <title>Poker Evaluator Pro</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,16 +14,15 @@
       <!-- Section Kartu Tangan -->
       <div class="section">
         <div class="section-header">
-          <h2>Kartu Tangan (Hole Cards)</h2>
+          <h2>Kartu Tangan Anda (Hole Cards)</h2>
           <button id="btn-open-hand" class="btn-add">+ Tangan</button>
         </div>
         <div id="hand-cards" class="card-group"></div>
         
-        <!-- Status Kartu Saat Ini & Persentase Kekuatan -->
         <div class="status-box">
-          <div>Kombinasi Saat Ini: <span id="current-hand-made" class="highlight">-</span></div>
+          <div>Kombinasi Tangan Anda: <span id="my-best-hand" class="highlight-green">-</span></div>
           <div class="strength-meter-inline">
-            <span>Kekuatan Tangan:</span>
+            <span>Win Equity:</span>
             <div class="progress-bar-bg">
               <div id="strength-bar" class="progress-bar-fill" style="width: 0%;"></div>
             </div>
@@ -39,18 +38,22 @@
           <button id="btn-open-comm" class="btn-add">+ Komunitas</button>
         </div>
         <div id="community-cards" class="card-group"></div>
+        
+        <div class="status-box board-status">
+          <div>Kombinasi Murni Meja: <span id="board-only-hand" class="highlight-yellow">-</span></div>
+        </div>
       </div>
 
-      <!-- Section Potensi Kombinasi Meja -->
+      <!-- Section Analisis Potensi & Ancaman Meja -->
       <div class="result-box">
-        <h2>Potensi / Perkiraan Kombinasi Meja:</h2>
-        <div id="potential-draws" class="potential-list">
-          <!-- Daftar potensi seperti Flush Draw, Straight Draw, dsb akan muncul di sini -->
+        <h2>Analisis Potensi & Ancaman Meja (Board Threat):</h2>
+        <div id="board-threats" class="potential-list">
+          <!-- Peringatan potensi flush/straight/full house lawan akan tampil di sini -->
         </div>
 
         <hr class="divider">
 
-        <h2>Kombinasi Terbaik Saat Ini (5 Kartu):</h2>
+        <h2>Kombinasi Final 5 Kartu Terbaik Anda:</h2>
         <div id="result-name" class="glow-text">-</div>
         <div id="best-cards" class="card-group"></div>
       </div>
