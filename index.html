@@ -13,45 +13,76 @@
 
       <!-- Section Kartu Tangan -->
       <div class="section">
-        <div class="section-header">
-          <h2>Kartu Tangan (Hole Cards)</h2>
-          <button id="btn-add-hand" class="btn-add">+ Kartu Tangan</button>
-        </div>
+        <h2>Kartu Tangan (Hole Cards)</h2>
         <div id="hand-cards" class="card-group"></div>
+        
+        <!-- Quick Select Inline -->
+        <div class="quick-picker">
+          <select id="hand-rank-select">
+            <option value="">-- Nilai --</option>
+            <option value="14">A</option><option value="13">K</option><option value="12">Q</option>
+            <option value="11">J</option><option value="10">10</option><option value="9">9</option>
+            <option value="8">8</option><option value="7">7</option><option value="6">6</option>
+            <option value="5">5</option><option value="4">4</option><option value="3">3</option>
+            <option value="2">2</option>
+          </select>
+          <select id="hand-suit-select">
+            <option value="">-- Simbol --</option>
+            <option value="SPADES">♠ Sekop</option>
+            <option value="HEARTS">♥ Hati</option>
+            <option value="CLUBS">♣ Keriting</option>
+            <option value="DIAMONDS">♦ Wajik</option>
+          </select>
+          <button id="btn-add-hand" class="btn-add">+ Tangan</button>
+        </div>
+
         <div class="eval-badge">
-          Kombinasi Kartu Tangan: <span id="hand-only-result" class="highlight">-</span>
+          Kombinasi Tangan: <span id="hand-only-result" class="highlight">-</span>
         </div>
       </div>
 
       <!-- Section Kartu Komunitas -->
       <div class="section">
-        <div class="section-header">
-          <h2>Kartu Komunitas (Board)</h2>
-          <button id="btn-add-community" class="btn-add">+ Kartu Komunitas</button>
-        </div>
+        <h2>Kartu Komunitas (Board)</h2>
         <div id="community-cards" class="card-group"></div>
-        <div class="eval-badge">
-          Kombinasi Kartu Komunitas: <span id="community-only-result" class="highlight">-</span>
+        
+        <!-- Quick Select Inline -->
+        <div class="quick-picker">
+          <select id="comm-rank-select">
+            <option value="">-- Nilai --</option>
+            <option value="14">A</option><option value="13">K</option><option value="12">Q</option>
+            <option value="11">J</option><option value="10">10</option><option value="9">9</option>
+            <option value="8">8</option><option value="7">7</option><option value="6">6</option>
+            <option value="5">5</option><option value="4">4</option><option value="3">3</option>
+            <option value="2">2</option>
+          </select>
+          <select id="comm-suit-select">
+            <option value="">-- Simbol --</option>
+            <option value="SPADES">♠ Sekop</option>
+            <option value="HEARTS">♥ Hati</option>
+            <option value="CLUBS">♣ Keriting</option>
+            <option value="DIAMONDS">♦ Wajik</option>
+          </select>
+          <button id="btn-add-community" class="btn-add">+ Komunitas</button>
         </div>
       </div>
 
-      <!-- Section Hasil Akhir Gabungan -->
+      <!-- Section Persentase Kekuatan & Kombinasi Meja -->
       <div class="result-box">
+        <div class="strength-meter">
+          <h3>Kekuatan Kartu (Win Equity):</h3>
+          <div class="progress-bar-bg">
+            <div id="strength-bar" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+          <div id="strength-percent" class="percent-text">0%</div>
+        </div>
+
+        <hr class="divider">
+
         <h2>Kombinasi Tertinggi Meja:</h2>
         <div id="result-name" class="glow-text">-</div>
         <div id="best-cards" class="card-group"></div>
       </div>
-    </div>
-  </div>
-
-  <!-- Modal Pop-up untuk Memilih Kartu -->
-  <div id="card-picker-modal" class="modal hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Pilih Kartu</h3>
-        <span id="close-modal" class="close-btn">&times;</span>
-      </div>
-      <div id="picker-grid" class="picker-grid"></div>
     </div>
   </div>
 
