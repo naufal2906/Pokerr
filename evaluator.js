@@ -9,6 +9,26 @@ export class PokerEvaluator {
     return [...withHead, ...withoutHead];
   }
 
+  // Evaluasi Khusus 2 Kartu Tangan Murni (Pocket Combination)
+  static evaluateHoleCardsOnly(handCards) {
+    if (handCards.length === 0) return "-";
+    if (handCards.length === 1) return `Single Card (${handCards[0].rank.label})`;
+
+    const c1 = handCards[0];
+    const c2 = handCards[1];
+
+    if (c1.rank.value === c2.rank.value) {
+      return `Pocket Pair (${c1.rank.label}s)`;
+    }
+
+    const isSuited = c1.suit.symbol === c2.suit.symbol;
+    const diff = Math.abs(c1.rank.value - c2.rank.value);
+    const suitedText = isSuited ? 'Suited' : 'Offsuit';
+
+    if (diff === 1) return `Connector (${c1.rank.label}-${c2.rank.label} ${suitedText})`;
+    return `High Card (${c1.rank.value > c2.rank.value ? c1.rank.label : c2.rank.label} High, ${suitedText})`;
+  }
+
   static evaluate5CardHand(cards) {
     const sorted = [...cards].sort((a, b) => b.rank.value - a.rank.value);
     const isFlush = sorted.every(c => c.suit.symbol === sorted[0].suit.symbol);
@@ -72,7 +92,7 @@ export class PokerEvaluator {
     return bestHand;
   }
 
-  // Menghitung Kartu Terkuat (The Nuts) yang meng-counter kartu meja
+  // Analisis Potensi & Counter Kartu Terkuat (Spesifik dengan Contoh Kartu)
   static analyzeBoardThreats(communityCards) {
     if (communityCards.length < 3) {
       return [{ text: "Masukkan minimal 3 Kartu Komunitas untuk menganalisis potensi.", safe: true, nutText: "" }];
@@ -86,7 +106,6 @@ export class PokerEvaluator {
 
     Object.entries(suitCounts).forEach(([suitSymbol, count]) => {
       if (count >= 3) {
-        // Cari kartu bernilai tertinggi yang BELUM ada di meja untuk simbol tersebut
         const usedRanks = communityCards
           .filter(c => c.suit.symbol === suitSymbol)
           .map(c => c.rank.value);
@@ -112,9 +131,6 @@ export class PokerEvaluator {
 
     // 2. Analisis Straight & Nut Straight Counter
     const boardValues = [...new Set(communityCards.map(c => c.rank.value))].sort((a,b) => a - b);
-    let straightNutText = "";
-
-    // Cek kemungkinan 5 urutan angka
     for (let highVal = 14; highVal >= 5; highVal--) {
       const targetSeq = [highVal, highVal-1, highVal-2, highVal-3, highVal-4];
       const matchCount = targetSeq.filter(v => boardValues.includes(v)).length;
@@ -123,18 +139,16 @@ export class PokerEvaluator {
         const missingVals = targetSeq.filter(v => !boardValues.includes(v));
         const valToLabel = v => v === 14 ? 'A' : v === 13 ? 'K' : v === 12 ? 'Q' : v === 11 ? 'J' : v.toString();
         
-        straightNutText = `👉 Nut Straight terkuat butuh kartu pegangan: [${missingVals.map(valToLabel).join(' + ')}]`;
-        
         threats.push({
           text: `🎯 Ancaman Straight: Ada urutan kartu bersambung di meja.`,
           safe: matchCount < 4,
-          nutText: straightNutText
+          nutText: `👉 Nut Straight terkuat butuh kartu pegangan: [${missingVals.map(valToLabel).join(' + ')}]`
         });
-        break; // Tampilkan hanya yang paling tinggi (Nut Straight)
+        break;
       }
     }
 
-    // 3. Analisis Pair / Full House di Meja
+    // 3. Analisis Pair / Full House / Four of a Kind di Meja dengan Contoh Kartu Murni
     const rankCounts = {};
     communityCards.forEach(c => rankCounts[c.rank.label] = (rankCounts[c.rank.label] || 0) + 1);
     
@@ -144,17 +158,31 @@ export class PokerEvaluator {
       if (cnt === 3) trips.push(label);
     });
 
-    if (trips.length > 0 || pairs.length >= 2) {
+    // Urutkan dari peringkat kartu tertinggi
+    const rankOrder = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
+    const sortedPairs = pairs.sort((a, b) => rankOrder.indexOf(a) - rankOrder.indexOf(b));
+
+    if (trips.length > 0) {
+      const tripLabel = trips[0];
+      threats.push({
+        text: `⚠️ Ancaman Sangat Tinggi: Ada Three of a Kind (${tripLabel}) di meja!`,
+        safe: false,
+        nutText: `👉 Kartu Terkuat (The Nuts): Pegang [${tripLabel}] untuk Four of a Kind!`
+      });
+    } else if (sortedPairs.length >= 2) {
+      const topPair = sortedPairs[0];
+      const secondPair = sortedPairs[1];
       threats.push({
         text: `⚠️ Ancaman Full House / Four of a Kind di meja!`,
         safe: false,
-        nutText: `👉 Kartu Counter Terkuat: Pemain yang memegang Pair kartu tertinggi di meja.`
+        nutText: `👉 Kartu Terkuat: Pegang [${topPair} + ${topPair}] untuk Four of a Kind (${topPair}s), atau [${secondPair} + ${secondPair}] untuk Full House.`
       });
-    } else if (pairs.length === 1) {
+    } else if (sortedPairs.length === 1) {
+      const pairLabel = sortedPairs[0];
       threats.push({
-        text: `⚡ Ada Pair (${pairs[0]}) di meja.`,
+        text: `⚡ Ada Pair (${pairLabel}) di meja (Potensi Trips / Full House lawan).`,
         safe: true,
-        nutText: `👉 Counter Terkuat lawan: Pegang kartu [${pairs[0]}] untuk Three of a Kind / Full House.`
+        nutText: `👉 Counter Terkuat: Pegang [${pairLabel}] untuk Three of a Kind / Full House.`
       });
     }
 
