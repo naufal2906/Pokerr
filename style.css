@@ -72,7 +72,12 @@ body {
 h2 {
   font-size: 0.95rem;
   color: #a0aec0;
-  margin: 0 0 8px 0;
+  margin: 0;
+}
+
+.btn-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .btn-add {
@@ -86,6 +91,22 @@ h2 {
   cursor: pointer;
 }
 
+.btn-clear {
+  background: rgba(255, 0, 85, 0.2);
+  border: 1px solid rgba(255, 0, 85, 0.5);
+  color: #ff0055;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  border-radius: 15px;
+  cursor: pointer;
+}
+
+.btn-clear:hover {
+  background: #ff0055;
+  color: #fff;
+}
+
 .card-group {
   display: flex;
   justify-content: center;
@@ -96,6 +117,7 @@ h2 {
 }
 
 .card {
+  position: relative;
   width: 58px;
   height: 82px;
   background: #ffffff;
@@ -111,6 +133,38 @@ h2 {
   box-sizing: border-box;
 }
 
+.card.clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card.clickable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 10px #ff0055;
+}
+
+.card.clickable::after {
+  content: "×";
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #ff0055;
+  color: #fff;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.card.clickable:hover::after {
+  opacity: 1;
+}
+
 .card.red { color: #e63946; }
 .card.black { color: #1d3557; }
 
@@ -120,10 +174,6 @@ h2 {
   border-radius: 8px;
   font-size: 0.85rem;
   color: #cbd5e1;
-}
-
-.board-status {
-  border-left: 3px solid #ffbe0b;
 }
 
 .strength-meter-inline {
@@ -158,11 +208,6 @@ h2 {
   font-weight: bold;
 }
 
-.highlight-yellow {
-  color: #ffbe0b;
-  font-weight: bold;
-}
-
 .result-box {
   margin-top: 15px;
   padding: 15px;
@@ -174,24 +219,32 @@ h2 {
 .potential-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
 .potential-item {
   background: rgba(255, 0, 85, 0.1);
   border: 1px solid rgba(255, 0, 85, 0.3);
-  padding: 6px 10px;
-  border-radius: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
   font-size: 0.85rem;
   color: #ff4d6d;
   text-align: left;
+  line-height: 1.4;
 }
 
 .potential-item.safe {
   background: rgba(0, 240, 255, 0.1);
   border-color: rgba(0, 240, 255, 0.3);
   color: #00f0ff;
+}
+
+.potential-item .nut-card {
+  color: #ffbe0b;
+  font-weight: bold;
+  display: block;
+  margin-top: 3px;
 }
 
 .divider {
