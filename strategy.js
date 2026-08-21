@@ -34,7 +34,7 @@ export class PokerStrategy {
     const activeCommunity = communityCards.filter(c => c !== null);
 
     if (activeHand.length < 2) {
-      return { action: "WAIT", amount: 0, reason: "Masukkan 2 kartu tangan untuk analisis." };
+      return { action: "WAIT", amount: 0, reason: "Masukkan 2 kartu tangan untuk saran betting." };
     }
 
     const commCount = activeCommunity.length;
@@ -77,7 +77,7 @@ export class PokerStrategy {
     const equity = PokerEvaluator.calculateStrength(activeHand, activeCommunity);
     const threats = PokerEvaluator.analyzeBoardThreats(activeCommunity);
     
-    // Perbaikan: Cek spesifik apakah ada ancaman Flush, Full House, atau Straight Nyata
+    // Pengecekan spesifik ancaman Straight & Flush di meja
     const hasStraightThreat = threats.some(t => t.text.includes("Straight"));
     const hasDangerThreat = threats.some(t => !t.safe) || hasStraightThreat;
 
@@ -103,7 +103,7 @@ export class PokerStrategy {
         return {
           action: "CHECK / CALL",
           amount: bigBlind,
-          reason: `[${phaseName}] Anda punya ${bestHand.rankName}, namun ada potensi Straight lawan (K+J) di meja. Sebaiknya Check / Call taruhan kecil saja.`
+          reason: `[${phaseName}] Anda punya ${bestHand.rankName}, namun ada potensi Straight lawan di meja. Sebaiknya Check / Call taruhan kecil saja.`
         };
       }
 
