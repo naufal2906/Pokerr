@@ -2,35 +2,63 @@ export class PokerEvaluator {
   static RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   static SUITS = ['♠', '♥', '♦', '♣'];
 
-  // Safe Guard Filter Kartu
+  // Helper untuk memfilter hanya kartu yang valid
   static getValidCards(cards) {
     if (!Array.isArray(cards)) return [];
     return cards.filter(c => c && c.rank && typeof c.rank.value === 'number' && c.suit);
   }
 
-  // 1. Dapatkan Kombinasi Kartu Terbaik
+  // 1. Method Khusus Evaluasi 2 Kartu Tangan Murni (Diperlukan oleh app.js)
+  static evaluateHoleCardsOnly(handCards) {
+    const valid = this.getValidCards(handCards);
+    if (valid.length < 2) return "-";
+
+    const c1 = valid[0];
+    const c2 = valid[1];
+
+    if (c1.rank.value === c2.rank.value) {
+      return `Pocket Pair (${c1.rank.label}s)`;
+    }
+
+    const highCard = c1.rank.value > c2.rank.value ? c1.rank.label : c2.rank.label;
+    const isSuited = c1.suit.symbol === c2.suit.symbol;
+    const suitedText = isSuited ? "Suited" : "Offsuit";
+
+    return `High Card ${highCard} (${suitedText})`;
+  }
+
+  // 2. Evaluasi Kombinasi Kartu Terbaik
   static getBestHand(cards) {
     const validCards = this.getValidCards(cards);
 
     if (validCards.length === 0) {
-      return { score: 0, rankName: "High Card" };
+      return { score: 0, rankName: "-", cards: [] };
     }
 
     if (validCards.length < 5) {
-      return this.evaluateSubset(validCards);
+      const subResult = this.evaluateSubset(validCards);
+      return {
+        score: subResult.score,
+        rankName: subResult.rankName,
+        cards: validCards
+      };
     }
 
     const combinations = this.getCombinations(validCards, 5);
-    let bestHand = { score: 0, rankName: "High Card" };
+    let bestHand = { score: 0, rankName: "High Card", cards: [] };
 
     for (const combo of combinations) {
       const evalResult = this.evaluate5CardHand(combo);
       if (evalResult.score > bestHand.score) {
-        bestHand = evalResult;
+        bestHand = {
+          score: evalResult.score,
+          rankName: evalResult.rankName,
+          cards: combo
+        };
       }
     }
 
-    // Deteksi Potensi Draw untuk Tampilan UI
+    // Deteksi Teks Straight Draw jika kombinasi belum jadi Straight
     const ranks = [...new Set(validCards.map(c => c.rank.value))].sort((a, b) => a - b);
     const drawText = this.checkStraightDrawNeeded(ranks);
     if (drawText && bestHand.score < 5) {
@@ -40,10 +68,10 @@ export class PokerEvaluator {
     return bestHand;
   }
 
-  // Evaluasi < 5 Kartu (Aman dari null/undefined)
+  // Evaluasi Subset (< 5 Kartu)
   static evaluateSubset(cards) {
     const validCards = this.getValidCards(cards);
-    if (validCards.length === 0) return { score: 0, rankName: "High Card" };
+    if (validCards.length === 0) return { score: 0, rankName: "-" };
 
     const ranks = validCards.map(c => c.rank.value);
     const counts = {};
@@ -63,7 +91,7 @@ export class PokerEvaluator {
   // Evaluasi 5 Kartu Murni
   static evaluate5CardHand(cards) {
     const validCards = this.getValidCards(cards);
-    if (validCards.length < 5) return { score: 0, rankName: "High Card" };
+    if (validCards.length < 5) return { score: 0, rankName: "-" };
 
     const isFlush = validCards.every(c => c.suit.symbol === validCards[0].suit.symbol);
     const ranks = validCards.map(c => c.rank.value).sort((a, b) => a - b);
@@ -92,7 +120,7 @@ export class PokerEvaluator {
     return { score: 1, rankName: "High Card" };
   }
 
-  // Deteksi Teks Kartu Penyambung Straight
+  // Deteksi Teks Kartu Penyambung Straight (A/9 dll)
   static checkStraightDrawNeeded(ranks) {
     if (!Array.isArray(ranks)) return null;
     const rankSet = new Set(ranks);
@@ -112,7 +140,7 @@ export class PokerEvaluator {
     return null;
   }
 
-  // Helper Kombinasi 5 Kartu
+  // Helper Kombinasi
   static getCombinations(arr, k) {
     if (k === 0 || arr.length < k) return [[]];
     if (k === arr.length) return [arr];
@@ -122,7 +150,7 @@ export class PokerEvaluator {
     return [...withFirst, ...withoutFirst];
   }
 
-  // Analisis Potensi Bahaya Kartu Komunitas
+  // Analisis Ancaman Meja
   static analyzeBoardThreats(communityCards) {
     const threats = [];
     const validComm = this.getValidCards(communityCards);
@@ -136,12 +164,16 @@ export class PokerEvaluator {
     });
 
     if (Object.values(suitCounts).some(cnt => cnt >= 3)) {
-      threats.push({ safe: false, text: "Potensi Flush lawan di meja" });
+      threats.push({ safe: false, text: "Potensi Flush lawan di meja", nutText: "Waspada Kartu Same Suit" });
     }
 
     const highRanks = ranks.filter(r => r >= 10);
     if (highRanks.length >= 3) {
-      threats.push({ safe: false, text: "Papan sangat rawan Straight lawan" });
+      threats.push({ safe: false, text: "Papan rawan Straight lawan", nutText: "Waspada Konektor Tinggi" });
+    }
+
+    if (threats.length === 0) {
+      threats.push({ safe: true, text: "Papan Relatif Aman", nutText: "" });
     }
 
     return threats;
