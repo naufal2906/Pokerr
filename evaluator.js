@@ -2,10 +2,15 @@ export class PokerEvaluator {
   static RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   static SUITS = ['♠', '♥', '♦', '♣'];
 
+  // Safe Guard Filter Kartu
+  static getValidCards(cards) {
+    if (!Array.isArray(cards)) return [];
+    return cards.filter(c => c && c.rank && typeof c.rank.value === 'number' && c.suit);
+  }
+
   // 1. Dapatkan Kombinasi Kartu Terbaik
   static getBestHand(cards) {
-    // Filter kartu valid (mengabaikan null/undefined)
-    const validCards = (cards || []).filter(c => c && c.rank && typeof c.rank.value !== 'undefined');
+    const validCards = this.getValidCards(cards);
 
     if (validCards.length === 0) {
       return { score: 0, rankName: "High Card" };
@@ -25,7 +30,7 @@ export class PokerEvaluator {
       }
     }
 
-    // Tampilkan informasi tambahan jika ada indikasi Straight Draw
+    // Deteksi Potensi Draw untuk Tampilan UI
     const ranks = [...new Set(validCards.map(c => c.rank.value))].sort((a, b) => a - b);
     const drawText = this.checkStraightDrawNeeded(ranks);
     if (drawText && bestHand.score < 5) {
@@ -35,11 +40,12 @@ export class PokerEvaluator {
     return bestHand;
   }
 
-  // Evaluasi jika kartu kurang dari 5 (Pre-Flop / Flop tidak lengkap)
+  // Evaluasi < 5 Kartu (Aman dari null/undefined)
   static evaluateSubset(cards) {
-    if (!cards || cards.length === 0) return { score: 0, rankName: "High Card" };
+    const validCards = this.getValidCards(cards);
+    if (validCards.length === 0) return { score: 0, rankName: "High Card" };
 
-    const ranks = cards.map(c => c.rank.value);
+    const ranks = validCards.map(c => c.rank.value);
     const counts = {};
     ranks.forEach(r => counts[r] = (counts[r] || 0) + 1);
 
@@ -56,10 +62,12 @@ export class PokerEvaluator {
 
   // Evaluasi 5 Kartu Murni
   static evaluate5CardHand(cards) {
-    const isFlush = cards.every(c => c.suit.symbol === cards[0].suit.symbol);
-    const ranks = cards.map(c => c.rank.value).sort((a, b) => a - b);
+    const validCards = this.getValidCards(cards);
+    if (validCards.length < 5) return { score: 0, rankName: "High Card" };
 
-    // Cek Straight
+    const isFlush = validCards.every(c => c.suit.symbol === validCards[0].suit.symbol);
+    const ranks = validCards.map(c => c.rank.value).sort((a, b) => a - b);
+
     let isStraight = false;
     if (ranks[4] - ranks[0] === 4 && new Set(ranks).size === 5) {
       isStraight = true;
@@ -84,18 +92,16 @@ export class PokerEvaluator {
     return { score: 1, rankName: "High Card" };
   }
 
-  // Deteksi Teks Kartu Penyambung Straight (A/9 dll)
+  // Deteksi Teks Kartu Penyambung Straight
   static checkStraightDrawNeeded(ranks) {
+    if (!Array.isArray(ranks)) return null;
     const rankSet = new Set(ranks);
     const needed = [];
 
-    // Kasus 10-J-Q-K
     if (rankSet.has(10) && rankSet.has(11) && rankSet.has(12) && rankSet.has(13)) {
       if (!rankSet.has(14)) needed.push("As");
       if (!rankSet.has(9)) needed.push("9");
-    }
-    // Kasus 9-10-J-Q
-    else if (rankSet.has(9) && rankSet.has(10) && rankSet.has(11) && rankSet.has(12)) {
+    } else if (rankSet.has(9) && rankSet.has(10) && rankSet.has(11) && rankSet.has(12)) {
       if (!rankSet.has(13)) needed.push("King");
       if (!rankSet.has(8)) needed.push("8");
     }
@@ -119,7 +125,7 @@ export class PokerEvaluator {
   // Analisis Potensi Bahaya Kartu Komunitas
   static analyzeBoardThreats(communityCards) {
     const threats = [];
-    const validComm = (communityCards || []).filter(c => c && c.rank);
+    const validComm = this.getValidCards(communityCards);
     if (validComm.length < 3) return threats;
 
     const suitCounts = {};
@@ -143,8 +149,8 @@ export class PokerEvaluator {
 
   // Hitung Estimasi Win Equity Sederhana
   static calculateStrength(handCards, communityCards) {
-    const activeHand = (handCards || []).filter(c => c && c.rank);
-    const activeComm = (communityCards || []).filter(c => c && c.rank);
+    const activeHand = this.getValidCards(handCards);
+    const activeComm = this.getValidCards(communityCards);
     if (activeHand.length < 2) return 0;
 
     const total = [...activeHand, ...activeComm];
