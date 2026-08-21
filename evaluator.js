@@ -7,7 +7,7 @@ export class PokerEvaluator {
     return cards.filter(c => c && c.rank && typeof c.rank.value === 'number' && c.suit);
   }
 
-  // Evaluasi 2 Kartu Tangan Murni
+  // Evaluasi 2 Kartu Tangan
   static evaluateHoleCardsOnly(handCards) {
     const valid = this.getValidCards(handCards);
     if (valid.length < 2) return "-";
@@ -24,7 +24,34 @@ export class PokerEvaluator {
     return `High Card ${highCard} (${isSuited ? "Suited" : "Offsuit"})`;
   }
 
-  // Deteksi Detil Kurang 1 Kartu untuk 7 Kombinasi
+  // Deteksi Kartu Terkuat Lawan di Board (The Nuts Counter)
+  static getBoardNutHand(communityCards) {
+    const validComm = this.getValidCards(communityCards);
+    if (validComm.length < 3) return { hasFlushThreat: false, highestThreat: "-", nutCards: "-" };
+
+    const suitCounts = {};
+    validComm.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
+
+    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] >= 3);
+    const suitNames = { '♣': 'Keriting', '♠': 'Sekop', '♥': 'Hati', '♦': 'Diamond' };
+
+    if (flushSuit) {
+      const sName = suitNames[flushSuit] || flushSuit;
+      return {
+        hasFlushThreat: true,
+        highestThreat: `Flush (${sName})`,
+        nutCards: `Lawan memegang 2 kartu ${sName} (Terkuat: A${flushSuit} K${flushSuit})`
+      };
+    }
+
+    return {
+      hasFlushThreat: false,
+      highestThreat: "Straight / Set",
+      nutCards: "Kombinasi Murni Kartu Meja"
+    };
+  }
+
+  // Deteksi Potensi Draw (Kurang 1 Kartu)
   static detectDraws(cards) {
     const validCards = this.getValidCards(cards);
     if (validCards.length < 3) return null;
@@ -47,7 +74,7 @@ export class PokerEvaluator {
 
     const draws = [];
 
-    // Grouping kartu berdasarkan simbol/suit
+    // 1. Royal Flush & Straight Flush Draw
     const cardsBySuit = {};
     validCards.forEach(c => {
       const symbol = c.suit.symbol;
@@ -55,11 +82,9 @@ export class PokerEvaluator {
       cardsBySuit[symbol].push(c);
     });
 
-    // 1. ROYAL FLUSH & STRAIGHT FLUSH DRAW (Angka + Simbol Khusus)
     for (const [symbol, sCards] of Object.entries(cardsBySuit)) {
       if (sCards.length >= 4) {
         const sRankSet = new Set(sCards.map(c => c.rank.value));
-
         for (const sw of straightWindows) {
           const matchRanks = sw.window.filter(r => sRankSet.has(r));
           if (matchRanks.length === 4) {
@@ -70,8 +95,8 @@ export class PokerEvaluator {
 
             draws.push({
               type: isRoyal ? 'ROYAL_FLUSH_DRAW' : 'STRAIGHT_FLUSH_DRAW',
-              text: `${drawType}`,
-              needed: `SANGAT KRUSIAL! Butuh Khusus Kartu ${labelMap[missingRank]} ${suitText} (Untuk ${isRoyal ? 'ROYAL FLUSH' : 'STRAIGHT FLUSH'})`
+              text: drawType,
+              needed: `KRUSIAL! Butuh Khusus Kartu ${labelMap[missingRank]} ${suitText}`
             });
             return draws;
           }
@@ -79,36 +104,33 @@ export class PokerEvaluator {
       }
     }
 
-    // Perhitungan Jumlah Kembar (Rank Counts)
     const counts = {};
     validCards.forEach(c => counts[c.rank.value] = (counts[c.rank.value] || 0) + 1);
     const pairs = Object.keys(counts).filter(r => counts[r] === 2);
     const trips = Object.keys(counts).filter(r => counts[r] === 3);
 
-    // 2. FOUR OF A KIND DRAW (Sudah Trips/Set, kurang 1 lagi untuk Quads)
+    // 2. Four of a Kind Draw
     if (trips.length > 0) {
-      const tripRank = trips[0];
       draws.push({
         type: 'QUADS_DRAW',
         text: 'Four of a Kind Draw',
-        needed: `Butuh 1 Kartu ${labelMap[tripRank]} lagi (Simbol Bebas) untuk Four of a Kind`
+        needed: `Butuh 1 Kartu ${labelMap[trips[0]]} lagi (Simbol Bebas)`
       });
     }
 
-    // 3. FULL HOUSE DRAW (Dua Pair butuh 1 kartu kembar ke Trips, ATAU Trips butuh Pair)
+    // 3. Full House Draw
     if (pairs.length >= 2 && trips.length === 0) {
       const pairNames = pairs.map(r => labelMap[r]).join(" / ");
       draws.push({
         type: 'FULL_HOUSE_DRAW',
         text: 'Full House Draw',
-        needed: `Butuh 1 Kartu ${pairNames} (Simbol Bebas) untuk Full House`
+        needed: `Butuh 1 Kartu ${pairNames} (Simbol Bebas)`
       });
     }
 
-    // 4. FLUSH DRAW (4 kartu warna sama, butuh 1 kartu simbol tertentu)
+    // 4. Flush Draw
     const suitCounts = {};
     validCards.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
-
     for (const [suitSymbol, count] of Object.entries(suitCounts)) {
       if (count === 4) {
         draws.push({
@@ -119,7 +141,7 @@ export class PokerEvaluator {
       }
     }
 
-    // 5. STRAIGHT DRAW (4 kartu urut, butuh 1 angka tertentu)
+    // 5. Straight Draw
     const rankSet = new Set(validCards.map(c => c.rank.value));
     for (const sw of straightWindows) {
       const matchRanks = sw.window.filter(r => rankSet.has(r));
@@ -135,26 +157,22 @@ export class PokerEvaluator {
       }
     }
 
-    // 6. THREE OF A KIND DRAW (Sudah One Pair, butuh 1 kartu bernilai sama)
+    // 6. Three of a Kind Draw
     if (pairs.length === 1 && trips.length === 0 && draws.length === 0) {
-      const pairRank = pairs[0];
       draws.push({
         type: 'TRIPS_DRAW',
         text: 'Three of a Kind Draw',
-        needed: `Butuh 1 Kartu ${labelMap[pairRank]} lagi (Simbol Bebas) untuk Three of a Kind`
+        needed: `Butuh 1 Kartu ${labelMap[pairs[0]]} lagi (Simbol Bebas)`
       });
     }
 
     return draws.length > 0 ? draws : null;
   }
 
-  // Kombinasi Kartu Terbaik
+  // Evaluasi Kombinasi Terbaik
   static getBestHand(cards) {
     const validCards = this.getValidCards(cards);
-
-    if (validCards.length === 0) {
-      return { score: 0, rankName: "-", cards: [] };
-    }
+    if (validCards.length === 0) return { score: 0, rankName: "-", cards: [] };
 
     if (validCards.length < 5) {
       const subResult = this.evaluateSubset(validCards);
@@ -163,13 +181,7 @@ export class PokerEvaluator {
       if (draws && draws.length > 0) {
         rankText += ` [${draws.map(d => d.needed).join(' & ')}]`;
       }
-
-      return {
-        score: subResult.score,
-        rankName: rankText,
-        cards: validCards,
-        draws: draws
-      };
+      return { score: subResult.score, rankName: rankText, cards: validCards, draws: draws };
     }
 
     const combinations = this.getCombinations(validCards, 5);
@@ -178,11 +190,7 @@ export class PokerEvaluator {
     for (const combo of combinations) {
       const evalResult = this.evaluate5CardHand(combo);
       if (evalResult.score > bestHand.score) {
-        bestHand = {
-          score: evalResult.score,
-          rankName: evalResult.rankName,
-          cards: combo
-        };
+        bestHand = { score: evalResult.score, rankName: evalResult.rankName, cards: combo };
       }
     }
 
@@ -265,9 +273,7 @@ export class PokerEvaluator {
     const suitCounts = {};
     const ranks = validComm.map(c => c.rank.value).sort((a, b) => a - b);
 
-    validComm.forEach(c => {
-      suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1;
-    });
+    validComm.forEach(c => suitCounts[c.suit.symbol] = (suitCounts[c.suit.symbol] || 0) + 1);
 
     if (Object.values(suitCounts).some(cnt => cnt >= 3)) {
       threats.push({ safe: false, text: "Potensi Flush lawan di meja", nutText: "Waspada Kartu Same Suit" });
