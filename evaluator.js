@@ -5,7 +5,7 @@ export class PokerEvaluator {
     return (cards || []).filter(c => c && (c.rank || c.value));
   }
 
-  // Format Helper: Mengubah objek kartu menjadi string ber-simbol (misal: "10♣")
+  // Helper Format Kartu ke Teks Simbol (Contoh: "10♣")
   static formatCardText(card) {
     if (!card) return '';
     const label = card.rank ? card.rank.label : (card.label || card.value);
@@ -43,7 +43,7 @@ export class PokerEvaluator {
     const draws = [];
     const values = [...new Set(all.map(c => c.rank ? c.rank.value : c.value))].sort((a, b) => a - b);
     
-    // Cek Flush Draw (4 kartu sejenis)
+    // Cek Flush Draw
     const suitCounts = {};
     all.forEach(c => {
       const s = c.suit ? (c.suit.symbol || c.suit) : c.suit;
@@ -51,11 +51,11 @@ export class PokerEvaluator {
     });
     Object.keys(suitCounts).forEach(s => {
       if (suitCounts[s] === 4) {
-        draws.push(`🌊 **Flush Draw!** Butuh 1 kartu kembang ${s} lagi.`);
+        draws.push(`🌊 <b>Flush Draw!</b> Butuh 1 kartu kembang ${s} lagi.`);
       }
     });
 
-    // Cek Straight Draw (4 kartu berurutan)
+    // Cek Straight Draw
     if (values.includes(14)) values.unshift(1);
     for (let target = 2; target <= 14; target++) {
       if (!values.includes(target)) {
@@ -66,7 +66,7 @@ export class PokerEvaluator {
             consecutive++;
             if (consecutive >= 5) {
               const neededLabel = target === 14 ? 'A' : target === 13 ? 'K' : target === 12 ? 'Q' : target === 11 ? 'J' : target === 1 ? 'A' : target;
-              draws.push(`🎯 **Straight Draw!** Butuh 1 kartu [${neededLabel}] lagi.`);
+              draws.push(`🎯 <b>Straight Draw!</b> Butuh 1 kartu [${neededLabel}] lagi.`);
               break;
             }
           } else if (testSet[i + 1] !== testSet[i]) {
@@ -79,48 +79,94 @@ export class PokerEvaluator {
     return [...new Set(draws)];
   }
 
-  // 3. ANALISIS ANCAMAN MEJA & THE NUTS
+  // 3. ANALISIS ANCAMAN MEJA & WORST-CASE SCENARIO
   static analyzeBoardThreats(communityCards) {
     const comm = this.getValidCards(communityCards);
-    if (comm.length < 3) return [{ text: "Menunggu Flop (Minimal 3 Kartu)", safe: true }];
+    if (comm.length < 3) {
+      return [{
+        text: "Menunggu Flop (Minimal 3 Kartu)",
+        boardPotential: "Belum Ada Board",
+        worstCase: "Belum Ada Board",
+        safe: true
+      }];
+    }
 
     const threats = [];
     const ranks = comm.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
+    const uniqueRanks = [...new Set(ranks)].sort((a, b) => a - b);
 
+    // Hitung Kembang
     const suitCounts = {};
     comm.forEach(c => {
       const s = c.suit ? (c.suit.symbol || c.suit) : c.suit;
       suitCounts[s] = (suitCounts[s] || 0) + 1;
     });
+    const maxSuitCount = Math.max(...Object.values(suitCounts));
+    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] === maxSuitCount);
 
+    // Hitung Pair di Meja
     const rankCounts = {};
     ranks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
+    const hasBoardPair = Object.values(rankCounts).some(count => count >= 2);
 
-    const isFlushThreat = Object.values(suitCounts).some(count => count >= 3);
-    const maxCommRank = Math.max(...ranks);
-    const maxLabel = maxCommRank === 14 ? 'A' : maxCommRank === 13 ? 'K' : maxCommRank === 12 ? 'Q' : maxCommRank === 11 ? 'J' : maxCommRank;
+    // Hitung Straight
+    let straightPossible = false;
+    let straightNeeds = [];
+    
+    const straightRanks = [...uniqueRanks];
+    if (straightRanks.includes(14)) straightRanks.unshift(1);
 
-    const pairs = Object.keys(rankCounts).filter(r => rankCounts[r] >= 2);
-    if (pairs.length > 0) {
+    for (let i = 0; i <= straightRanks.length - 4; i++) {
+      if (straightRanks[i + 3] - straightRanks[i] === 3) {
+        straightPossible = true;
+        const lowNeed = straightRanks[i] - 1;
+        const highNeed = straightRanks[i + 3] + 1;
+        if (lowNeed >= 1) straightNeeds.push(lowNeed === 1 ? 'A' : lowNeed);
+        if (highNeed <= 14) straightNeeds.push(highNeed === 14 ? 'A' : highNeed === 13 ? 'K' : highNeed === 12 ? 'Q' : highNeed === 11 ? 'J' : highNeed);
+      }
+    }
+
+    // A. MEJA PAIR
+    if (hasBoardPair) {
       threats.push({
-        text: `⚠️ Meja Ada Pair! Waspada Full House / Trips lawan.`,
-        nutText: `Kartu Lawan Terkuat: Set / Trips / Full House`,
+        text: `⚠️ Meja Berpasangan (Board Pair)`,
+        boardPotential: `Full House / Three of a Kind (Trips)`,
+        worstCase: `🚨 KEMUNGKINAN TERBURUK: Four of a Kind (Quads) atau Full House Tinggi lawan!`,
         safe: false
       });
     }
 
-    if (isFlushThreat) {
+    // B. MEJA FLUSH
+    if (maxSuitCount >= 3) {
       threats.push({
-        text: `🌊 Papan Ada 3+ Kartu Sejenis! Potensi Flush Tinggi.`,
-        nutText: `Kartu Terkuat (The Nuts): Flush`,
+        text: `🌊 Papan Basah (${maxSuitCount} Kartu Kembang ${flushSuit})`,
+        boardPotential: `Flush (Kembang ${flushSuit})`,
+        worstCase: `🚨 KEMUNGKINAN TERBURUK: Lawan Pegang Nut Flush (${flushSuit} As) mematahkan Straight/Set Anda!`,
         safe: false
       });
     }
 
-    if (!isFlushThreat && pairs.length === 0) {
+    // C. MEJA STRAIGHT
+    if (straightPossible) {
+      const highNeed = straightNeeds[straightNeeds.length - 1] || 'Urutan';
+      const lowNeed = straightNeeds[0] || 'Urutan';
+
       threats.push({
-        text: `⚡ Papan Relatif Basah (Kartu Tertinggi: ${maxLabel}).`,
-        nutText: `Waspada Lawan Pegang Overpair (${maxLabel}+) atau Straight Connector.`,
+        text: `🎯 Papan Berurutan (Straight Board)`,
+        boardPotential: `Straight (Urutan Kartu)`,
+        worstCase: `🚨 KEMUNGKINAN TERBURUK: Lawan Pegang [${highNeed}] (Straight Tertinggi / Nut Straight). Catatan: [${highNeed}] mengalahkan Straight dari kartu [${lowNeed}]!`,
+        safe: false
+      });
+    }
+
+    // D. MEJA AMAN / KERING
+    if (!hasBoardPair && maxSuitCount < 3 && !straightPossible) {
+      const maxRank = Math.max(...ranks);
+      const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
+      threats.push({
+        text: `⚡ Papan Kering / Aman (Dry Board)`,
+        boardPotential: `Top Pair (${maxLabel}) Kicker Kuat / Set`,
+        worstCase: `⚠️ KEMUNGKINAN TERBURUK: Lawan Pegang Overpair (${maxLabel}+) atau Kicker Lebih Tinggi saat Pair Sama.`,
         safe: true
       });
     }
@@ -152,60 +198,72 @@ export class PokerEvaluator {
     return Math.round(equity);
   }
 
-  // 5. EVALUASI 5 KARTU TERBAIK
+  // 5. EVALUASI 5 KARTU TERBAIK (DETAIL KICKER)
   static getBestHand(cards) {
     const valid = this.getValidCards(cards);
     if (valid.length === 0) return { score: 0, rankName: "-", cards: [] };
 
-    const values = valid.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
+    const sorted = [...valid].sort((a, b) => {
+      const va = a.rank ? a.rank.value : a.value;
+      const vb = b.rank ? b.rank.value : b.value;
+      return vb - va;
+    });
+
     const counts = {};
-    valid.forEach(c => {
+    sorted.forEach(c => {
       const v = c.rank ? c.rank.value : c.value;
       counts[v] = counts[v] || [];
       counts[v].push(c);
     });
 
-    const countLengths = Object.keys(counts).map(k => counts[k].length);
+    const pairKeys = Object.keys(counts).filter(k => counts[k].length === 2).map(Number).sort((a, b) => b - a);
 
     // Four of a Kind
-    if (countLengths.includes(4)) {
+    if (Object.values(counts).some(arr => arr.length === 4)) {
       const quadKey = Object.keys(counts).find(k => counts[k].length === 4);
       const quadCards = counts[quadKey].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      return { score: 8, rankName: `Four of a Kind (${quadCards})`, cards: valid.slice(0, 5) };
+      return { score: 8, rankName: `Four of a Kind (${quadCards})`, cards: sorted.slice(0, 5) };
     }
 
     // Full House
-    if (countLengths.includes(3) && countLengths.includes(2)) {
+    if (Object.values(counts).some(arr => arr.length === 3) && pairKeys.length > 0) {
       const tripKey = Object.keys(counts).find(k => counts[k].length === 3);
-      const pairKey = Object.keys(counts).find(k => counts[k].length === 2);
       const tripCards = counts[tripKey].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      const pairCards = counts[pairKey].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      return { score: 7, rankName: `Full House (${tripCards} ${pairCards})`, cards: valid.slice(0, 5) };
+      const pairCards = counts[pairKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      return { score: 7, rankName: `Full House (${tripCards} ${pairCards})`, cards: sorted.slice(0, 5) };
     }
 
     // Three of a Kind
-    if (countLengths.includes(3)) {
+    if (Object.values(counts).some(arr => arr.length === 3)) {
       const tripKey = Object.keys(counts).find(k => counts[k].length === 3);
       const tripCards = counts[tripKey].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      return { score: 4, rankName: `Three of a Kind (${tripCards})`, cards: valid.slice(0, 5) };
+      return { score: 4, rankName: `Three of a Kind (${tripCards})`, cards: sorted.slice(0, 5) };
     }
 
     // Two Pair
-    const pairKeys = Object.keys(counts).filter(k => counts[k].length === 2);
     if (pairKeys.length >= 2) {
       const p1 = counts[pairKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       const p2 = counts[pairKeys[1]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      return { score: 3, rankName: `Two Pair (${p1} & ${p2})`, cards: valid.slice(0, 5) };
+      return { score: 3, rankName: `Two Pair (${p1} & ${p2})`, cards: sorted.slice(0, 5) };
     }
 
-    // One Pair
+    // One Pair + Detail Kicker Utama
     if (pairKeys.length === 1) {
-      const pairCards = counts[pairKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      return { score: 2, rankName: `One Pair (${pairCards})`, cards: valid.slice(0, 5) };
+      const pairVal = pairKeys[0];
+      const pairCards = counts[pairVal].map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      
+      const kickers = sorted.filter(c => (c.rank ? c.rank.value : c.value) !== pairVal);
+      const topKicker = kickers.length > 0 ? PokerEvaluator.formatCardText(kickers[0]) : '';
+
+      return { 
+        score: 2, 
+        rankName: `One Pair (${pairCards}) - Kicker [${topKicker}]`, 
+        cards: sorted.slice(0, 5) 
+      };
     }
 
     // High Card
-    const topCard = this.formatCardText(valid[0]);
-    return { score: 1, rankName: `High Card (${topCard})`, cards: valid.slice(0, 5) };
+    const topCard = this.formatCardText(sorted[0]);
+    return { score: 1, rankName: `High Card (${topCard})`, cards: sorted.slice(0, 5) };
   }
 }
