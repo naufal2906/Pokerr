@@ -69,15 +69,18 @@ function updateEvaluation() {
   const threatContainer = document.getElementById('board-threats');
   if (threatContainer) {
     threatContainer.innerHTML = '';
-    const threats = PokerEvaluator.analyzeBoardThreats(activeCommunityCards);
+    const threats = PokerEvaluator.analyzeBoardThreats(activeCommunityCards, activeHandCards);
     
     threats.forEach(t => {
       const div = document.createElement('div');
-      div.className = `potential-item ${t.safe ? 'safe' : ''}`;
+      const isUp = t.indicator === '^';
+      div.className = `potential-item ${isUp ? 'safe' : ''}`;
       div.innerHTML = `
-        <div style="font-weight:bold; font-size:0.95rem; margin-bottom:4px; color:#fff;">${t.text}</div>
+        <div style="font-weight:bold; font-size:1.05rem; margin-bottom:6px; color:${isUp ? '#00ff87' : '#ff4d4d'};">
+          ${isUp ? '▲' : '▼'} ${t.text}
+        </div>
         <div style="font-size:0.85rem; color:#00f2fe; margin-bottom:4px;">📊 <b>Potensi Meja:</b> ${t.boardPotential}</div>
-        <div style="font-size:0.85rem; color:#ff4d4d;">${t.worstCase}</div>
+        <div style="font-size:0.85rem; color:${isUp ? '#00ff87' : '#ff4d4d'};">${t.worstCase}</div>
       `;
       threatContainer.appendChild(div);
     });
