@@ -8,33 +8,61 @@ class PokerApp {
     this.activeSlot = null; // { type: 'hole'|'community', index: number }
 
     this.initDOM();
+    this.renderInitialSlots();
     this.bindEvents();
     this.render();
   }
 
   initDOM() {
-    this.holeSlots = document.querySelectorAll('#hole-cards .card');
-    this.communitySlots = document.querySelectorAll('#community-cards .card');
-    this.holeDesc = document.getElementById('hole-desc');
-    this.handComboDesc = document.getElementById('hand-combo-desc');
-    this.equityFill = document.getElementById('equity-fill');
-    this.equityText = document.getElementById('equity-text');
-    this.comboBadgeContainer = document.getElementById('combo-badge-container'); // Container Tombol Hijau Kombinasi
-    
-    this.actionBadge = document.getElementById('action-badge');
-    this.strategyReason = document.getElementById('strategy-reason');
-    this.betAdviceBox = document.getElementById('bet-advice-box'); // Container Saran Bet Size
-    
-    this.threatContainer = document.getElementById('threat-container');
-    this.bestHandGlow = document.getElementById('best-hand-glow');
+    // DOM Containers Sesuai ID di index.html Anda
+    this.handCardsContainer = document.getElementById('hand-cards');
+    this.communityCardsContainer = document.getElementById('community-cards');
+    this.bestCardsContainer = document.getElementById('best-cards');
 
-    this.modal = document.getElementById('card-modal');
-    this.modalGrid = document.getElementById('modal-card-grid');
-    this.btnCloseModal = document.getElementById('btn-close-modal');
-    this.btnResetHole = document.getElementById('btn-reset-hole');
-    this.btnResetComm = document.getElementById('btn-reset-comm');
+    // Text & Stats
+    this.holeOnlyHand = document.getElementById('hole-only-hand');
+    this.myBestHand = document.getElementById('my-best-hand');
+    this.strengthBar = document.getElementById('strength-bar');
+    this.strengthPercent = document.getElementById('strength-percent');
+
+    // Strategy Section
+    this.stratAction = document.getElementById('strat-action');
+    this.stratAmount = document.getElementById('strat-amount');
+    this.stratReason = document.getElementById('strat-reason');
+
+    // Threat & Results Section
+    this.boardThreats = document.getElementById('board-threats');
+    this.resultName = document.getElementById('result-name');
+
+    // Buttons & Modal
+    this.btnClearHand = document.getElementById('btn-clear-hand');
+    this.btnClearComm = document.getElementById('btn-clear-comm');
+    this.modal = document.getElementById('card-picker-modal');
+    this.modalGrid = document.getElementById('full-card-grid');
+    this.closeModalBtn = document.getElementById('close-modal');
+    this.targetLabel = document.getElementById('target-label');
 
     this.generateModalCardGrid();
+  }
+
+  // Buat Slot Kartu Dinamis di HTML
+  renderInitialSlots() {
+    if (this.handCardsContainer) {
+      this.handCardsContainer.innerHTML = `
+        <div class="card placeholder" data-type="hole" data-index="0">+</div>
+        <div class="card placeholder" data-type="hole" data-index="1">+</div>
+      `;
+    }
+
+    if (this.communityCardsContainer) {
+      this.communityCardsContainer.innerHTML = `
+        <div class="card placeholder" data-type="community" data-index="0">+</div>
+        <div class="card placeholder" data-type="community" data-index="1">+</div>
+        <div class="card placeholder" data-type="community" data-index="2">+</div>
+        <div class="card placeholder" data-type="community" data-index="3">+</div>
+        <div class="card placeholder" data-type="community" data-index="4">+</div>
+      `;
+    }
   }
 
   generateModalCardGrid() {
@@ -74,27 +102,28 @@ class PokerApp {
   }
 
   bindEvents() {
-    this.holeSlots.forEach((slot, idx) => {
-      slot.addEventListener('click', () => this.openModal('hole', idx));
+    document.addEventListener('click', (e) => {
+      const cardSlot = e.target.closest('.card');
+      if (cardSlot && cardSlot.dataset.type) {
+        const type = cardSlot.dataset.type;
+        const index = parseInt(cardSlot.dataset.index, 10);
+        this.openModal(type, index);
+      }
     });
 
-    this.communitySlots.forEach((slot, idx) => {
-      slot.addEventListener('click', () => this.openModal('community', idx));
-    });
-
-    if (this.btnCloseModal) {
-      this.btnCloseModal.addEventListener('click', () => this.closeModal());
+    if (this.closeModalBtn) {
+      this.closeModalBtn.addEventListener('click', () => this.closeModal());
     }
 
-    if (this.btnResetHole) {
-      this.btnResetHole.addEventListener('click', () => {
+    if (this.btnClearHand) {
+      this.btnClearHand.addEventListener('click', () => {
         this.holeCards = [null, null];
         this.render();
       });
     }
 
-    if (this.btnResetComm) {
-      this.btnResetComm.addEventListener('click', () => {
+    if (this.btnClearComm) {
+      this.btnClearComm.addEventListener('click', () => {
         this.communityCards = [null, null, null, null, null];
         this.render();
       });
@@ -103,17 +132,21 @@ class PokerApp {
 
   openModal(type, index) {
     this.activeSlot = { type, index };
+    if (this.targetLabel) {
+      this.targetLabel.textContent = type === 'hole' ? `Kartu Tangan #${index + 1}` : `Kartu Komunitas #${index + 1}`;
+    }
     this.updateModalButtonsState();
-    this.modal.classList.remove('hidden');
+    if (this.modal) this.modal.classList.remove('hidden');
   }
 
   closeModal() {
-    this.modal.classList.add('hidden');
+    if (this.modal) this.modal.classList.add('hidden');
     this.activeSlot = null;
   }
 
   updateModalButtonsState() {
     const selectedCards = [...this.holeCards, ...this.communityCards].filter(Boolean);
+    if (!this.modalGrid) return;
     const buttons = this.modalGrid.querySelectorAll('.btn-card-select');
 
     buttons.forEach(btn => {
@@ -143,11 +176,13 @@ class PokerApp {
   }
 
   renderCardSlot(element, card) {
+    if (!element) return;
     if (card) {
-      element.className = `card filled ${card.suit.color}`;
+      const suitColor = card.suit.color || (card.suit.symbol === '♥' || card.suit.symbol === '♦' ? 'red' : 'black');
+      element.className = `card filled ${suitColor}`;
       element.innerHTML = `
-        <span class="card-rank">${card.rank.label}</span>
-        <span class="card-suit">${card.suit.symbol}</span>
+        <span class="card-rank">${card.rank.label || card.label}</span>
+        <span class="card-suit">${card.suit.symbol || card.suit}</span>
       `;
     } else {
       element.className = 'card placeholder';
@@ -155,49 +190,47 @@ class PokerApp {
     }
   }
 
-  // LOGIKA STRATEGI BETTING BERDASARKAN KEKUATAN & POT ODDS
+  // KALKULATOR BET SIZE CHIPS & STRATEGI
   getBettingAdvice(equity, myBestScore, commCount, draws) {
     let action = "CHECK / FOLD";
     let reason = "Tangan masih lemah, mainkan dengan kontrol pot minimum.";
-    let betChips = "0 Chips (Check)";
+    let betChips = "0 Chips";
 
     if (commCount === 0) {
-      // PRE-FLOP STRATEGY
       if (equity >= 75) {
         action = "RAISE / ALL-IN";
         reason = "[PRE-FLOP] Memegang Monster Hand! Buka Raise 3x - 5x Big Blind untuk memancing pot.";
-        betChips = "1.800 - 3.000 Chips (3x-5x BB)";
+        betChips = "1.800 - 3.000 Chips";
       } else if (equity >= 50) {
         action = "RAISE / CALL";
         reason = "[PRE-FLOP] Kartu standar tinggi. Naikkan taruhan 2.5x BB atau Call jika ada raise kecil.";
-        betChips = "1.500 Chips (2.5x BB)";
+        betChips = "1.500 Chips";
       } else {
         action = "CHECK / FOLD";
         reason = "[PRE-FLOP] Kartu relatif lemah. Buka Check jika gratis, atau Fold jika di-raise lawan.";
         betChips = "0 Chips (Fold jika di-raise)";
       }
     } else {
-      // POST-FLOP STRATEGY (FLOP, TURN, RIVER)
-      if (myBestScore >= 7) { // Full House, Quads, Straight Flush
+      if (myBestScore >= 7) {
         action = "RAISE / ALL-IN";
         reason = "Kombinasi Monster terbentuk! Lakukan Value Bet besar / All-in untuk memaksimalkan pot.";
         betChips = "3.000+ Chips / ALL-IN";
-      } else if (myBestScore >= 5 || equity >= 75) { // Flush, Straight, Set Tinggi
-        action = "RAISE / CALL BIG";
+      } else if (myBestScore >= 5 || equity >= 75) {
+        action = "RAISE / CALL";
         reason = "Kombinasi Kartu Jadi Sangat Kuat! Naikkan taruhan sekitar 60% - 75% ukuran Pot.";
         betChips = "1.800 - 2.400 Chips";
-      } else if (draws.length > 0) { // Flush / Straight Draw
-        action = "CALL / BET KECIL";
+      } else if (draws.length > 0) {
+        action = "CALL / BET";
         reason = `${draws[0]} Disarankan Bet / Call kecil (25% - 35% Pot) untuk mengejar kartu jadi.`;
-        betChips = "800 - 1.200 Chips (Pengejar Draw)";
-      } else if (myBestScore >= 2 && equity >= 40) { // Top Pair / Two Pair
+        betChips = "800 - 1.200 Chips";
+      } else if (myBestScore >= 2 && equity >= 40) {
         action = "CHECK / CALL";
         reason = "Memegang Pair / Made Hand moderat. Kontrol pot dengan Check atau Call taruhan standar.";
         betChips = "600 - 1.000 Chips";
       } else {
         action = "CHECK / FOLD";
         reason = "Belum membentuk kombinasi dan tidak ada Draw potensial. Fold jika lawan bertaruh besar.";
-        betChips = "0 Chips (Check/Fold)";
+        betChips = "0 Chips";
       }
     }
 
@@ -205,95 +238,112 @@ class PokerApp {
   }
 
   render() {
-    // Render Kartu Tangan
-    this.holeSlots.forEach((slot, i) => this.renderCardSlot(slot, this.holeCards[i]));
-    
-    // Render Kartu Komunitas
-    this.communitySlots.forEach((slot, i) => this.renderCardSlot(slot, this.communityCards[i]));
+    // Render Hole Slots
+    if (this.handCardsContainer) {
+      const slots = this.handCardsContainer.querySelectorAll('.card');
+      slots.forEach((slot, i) => this.renderCardSlot(slot, this.holeCards[i]));
+    }
 
-    // Deskripsi Hole Cards
-    this.holeDesc.textContent = PokerEvaluator.evaluateHoleCardsOnly(this.holeCards);
+    // Render Community Slots
+    if (this.communityCardsContainer) {
+      const slots = this.communityCardsContainer.querySelectorAll('.card');
+      slots.forEach((slot, i) => this.renderCardSlot(slot, this.communityCards[i]));
+    }
 
     const validHole = PokerEvaluator.getValidCards(this.holeCards);
     const validComm = PokerEvaluator.getValidCards(this.communityCards);
 
+    if (this.holeOnlyHand) {
+      this.holeOnlyHand.textContent = PokerEvaluator.evaluateHoleCardsOnly(this.holeCards);
+    }
+
     if (validHole.length < 2) {
-      this.handComboDesc.textContent = "Pilih 2 Kartu Tangan";
-      this.equityFill.style.width = "0%";
-      this.equityText.textContent = "0%";
-      this.actionBadge.textContent = "WAITING";
-      this.strategyReason.textContent = "Silakan masukkan 2 kartu tangan Anda terlebih dahulu.";
-      if (this.betAdviceBox) this.betAdviceBox.innerHTML = '';
-      if (this.comboBadgeContainer) this.comboBadgeContainer.innerHTML = '';
-      this.threatContainer.innerHTML = '';
-      this.bestHandGlow.textContent = "-";
+      if (this.myBestHand) this.myBestHand.textContent = "-";
+      if (this.strengthBar) this.strengthBar.style.width = "0%";
+      if (this.strengthPercent) this.strengthPercent.textContent = "0%";
+      if (this.stratAction) this.stratAction.textContent = "WAIT";
+      if (this.stratAmount) this.stratAmount.textContent = "0 Chips";
+      if (this.stratReason) this.stratReason.textContent = "Pilih 2 Kartu Tangan Terlebih Dahulu.";
+      if (this.boardThreats) this.boardThreats.innerHTML = '';
+      if (this.resultName) this.resultName.textContent = "-";
+      if (this.bestCardsContainer) this.bestCardsContainer.innerHTML = '';
       return;
     }
 
     // Hitung Win Equity & Best Hand
     const equity = PokerEvaluator.calculateStrength(this.holeCards, this.communityCards);
-    this.equityFill.style.width = `${equity}%`;
-    this.equityText.textContent = `${equity}%`;
+    if (this.strengthBar) this.strengthBar.style.width = `${equity}%`;
+    if (this.strengthPercent) this.strengthPercent.textContent = `${equity}%`;
 
     const myBest = PokerEvaluator.getBestHand([...validHole, ...validComm]);
     
-    // FIX KICKER PRE-FLOP KOSONG
-    if (validComm.length === 0 && myBest.rankName.includes('Kicker []')) {
-      this.handComboDesc.textContent = myBest.rankName.replace(' - Kicker []', '');
-    } else {
-      this.handComboDesc.textContent = myBest.rankName;
+    // Perbaikan Bug Kicker Pre-Flop Kosong
+    let comboText = myBest.rankName;
+    if (validComm.length === 0 && comboText.includes('- Kicker []')) {
+      comboText = comboText.replace(' - Kicker []', '');
     }
 
-    this.bestHandGlow.textContent = myBest.rankName;
+    if (this.myBestHand) this.myBestHand.textContent = comboText;
+    if (this.resultName) this.resultName.textContent = comboText;
 
-    // FITUR 1: BADGES INDIKATOR KOMBINASI HIJAU (LOKASI KOMBO)
-    if (this.comboBadgeContainer) {
+    // FITUR 1: TOMBOL/BADGE HIJAU INDIKATOR KOMBINASI DIBUAT DENGAN TAG ELEMEN
+    let comboBadgeContainer = document.getElementById('combo-green-badge-element');
+    if (!comboBadgeContainer && this.communityCardsContainer) {
+      comboBadgeContainer = document.createElement('div');
+      comboBadgeContainer.id = 'combo-green-badge-element';
+      this.communityCardsContainer.after(comboBadgeContainer);
+    }
+
+    if (comboBadgeContainer) {
       if (myBest && myBest.score >= 2) {
         const locationText = validComm.length === 0 
           ? "Di Tangan (Pre-Flop)" 
           : (myBest.score >= 5 ? "Tangan + Meja (Terbentuk)" : "Di Komunitas / Tangan");
         
-        this.comboBadgeContainer.innerHTML = `
+        comboBadgeContainer.innerHTML = `
           <div class="combo-green-badge">
             <span class="badge-icon">⚡</span>
-            <span>Kombinasi Aktif: <b>${myBest.rankName.split('(')[0]}</b> [${locationText}]</span>
+            <span>Kombinasi Aktif: <b>${comboText.split('(')[0]}</b> [${locationText}]</span>
           </div>
         `;
       } else {
-        this.comboBadgeContainer.innerHTML = '';
+        comboBadgeContainer.innerHTML = '';
       }
     }
 
-    // FITUR 2: SUGGESTION BET SIZE & STRATEGI
+    // FITUR 2: STRATEGI & ESTIMASI CHIPS BET
     const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
     const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws);
 
-    this.actionBadge.textContent = advice.action;
-    this.strategyReason.textContent = advice.reason;
+    if (this.stratAction) this.stratAction.textContent = advice.action;
+    if (this.stratAmount) this.stratAmount.textContent = advice.betChips;
+    if (this.stratReason) this.stratReason.textContent = advice.reason;
 
-    if (this.betAdviceBox) {
-      this.betAdviceBox.innerHTML = `
-        <div class="bet-chip-recommendation">
-          <span class="bet-label">💰 Estimasi Ukuran Bet / Call Ideal:</span>
-          <span class="bet-amount">${advice.betChips}</span>
-        </div>
-      `;
+    // FITUR 3: ANALISIS ANCAMAN MEJA
+    const threats = PokerEvaluator.analyzeBoardThreats(this.communityCards, this.holeCards);
+    if (this.boardThreats) {
+      this.boardThreats.innerHTML = '';
+      threats.forEach(t => {
+        const item = document.createElement('div');
+        item.className = `potential-item ${t.safe ? 'safe' : ''}`;
+        item.innerHTML = `
+          <div style="font-weight:bold; margin-bottom:4px;">${t.text}</div>
+          <div style="margin:4px 0;">📊 <b>${t.boardPotential}</b></div>
+          <div>${t.worstCase}</div>
+        `;
+        this.boardThreats.appendChild(item);
+      });
     }
 
-    // FITUR 3: THREAT ANALYSIS & WORST-CASE
-    const threats = PokerEvaluator.analyzeBoardThreats(this.communityCards, this.holeCards);
-    this.threatContainer.innerHTML = '';
-
-    threats.forEach(t => {
-      const item = document.createElement('div');
-      item.className = `potential-item ${t.safe ? 'safe' : ''}`;
-      item.innerHTML = `
-        <div class="threat-title">${t.text}</div>
-        <div style="margin:4px 0;">📊 <b>${t.boardPotential}</b></div>
-        <div>${t.worstCase}</div>
-      `;
-      this.threatContainer.appendChild(item);
-    });
+    // Render 5 Kartu Terbaik di Bagian Bawah
+    if (this.bestCardsContainer && myBest.cards) {
+      this.bestCardsContainer.innerHTML = '';
+      myBest.cards.forEach(c => {
+        const slot = document.createElement('div');
+        this.renderCardSlot(slot, c);
+        this.bestCardsContainer.appendChild(slot);
+      });
+    }
   }
 }
 
