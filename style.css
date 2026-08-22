@@ -295,6 +295,57 @@ h2 {
   border-left: 3px solid var(--accent-color);
 }
 
+/* FITUR BARU: TOMBOL HIJAU INDIKATOR KOMBO & BET SIZE */
+.combo-green-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(0, 255, 135, 0.12);
+  border: 1px solid rgba(0, 255, 135, 0.4);
+  color: var(--success-color);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-top: 10px;
+  box-shadow: 0 0 12px rgba(0, 255, 135, 0.15);
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.combo-green-badge .badge-icon {
+  font-size: 1rem;
+}
+
+.bet-chip-recommendation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-top: 10px;
+}
+
+.bet-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.bet-amount {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--warning-color);
+  text-shadow: 0 0 8px rgba(255, 202, 40, 0.3);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Section Result & Analysis */
 .result-box {
   margin-top: 12px;
