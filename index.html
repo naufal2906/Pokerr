@@ -50,16 +50,54 @@
         <div id="community-cards" class="card-group"></div>
       </div>
 
-      <!-- SECTION 3: STRATEGI BETTING -->
+      <!-- SECTION 3: STRATEGI BETTING & KALKULATOR POT ODDS -->
       <div class="section strategy-card">
         <h2>Saran Strategi & Betting (Blind 300/600)</h2>
+
+        <!-- DUAL INPUT POT & RAISE LAWAN FOR POT ODDS -->
+        <div style="margin-top: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <label for="pot-size-input" style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600;">Total Pot di Meja:</label>
+            <input type="number" id="pot-size-input" value="1000" min="0" step="100" style="
+              width: 130px;
+              background: rgba(0, 0, 0, 0.4);
+              border: 1px solid var(--accent-color);
+              color: var(--warning-color);
+              padding: 6px 10px;
+              border-radius: 8px;
+              font-weight: 800;
+              font-size: 0.95rem;
+              text-align: right;
+              outline: none;
+              box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+            ">
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <label for="opponent-bet-input" style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600;">Bet / Raise Lawan:</label>
+            <input type="number" id="opponent-bet-input" value="0" min="0" step="50" style="
+              width: 130px;
+              background: rgba(0, 0, 0, 0.4);
+              border: 1px solid var(--danger-color);
+              color: #ff4d7d;
+              padding: 6px 10px;
+              border-radius: 8px;
+              font-weight: 800;
+              font-size: 0.95rem;
+              text-align: right;
+              outline: none;
+              box-shadow: 0 0 8px rgba(255, 42, 95, 0.2);
+            ">
+          </div>
+        </div>
+
         <div class="strategy-body">
           <div class="strategy-action-container">
             <span class="strategy-label">Rekomendasi Aksi:</span>
             <span id="strat-action" class="action-badge">WAIT</span>
           </div>
           <div class="strategy-amount-container">
-            <span class="strategy-label">Estimasi Size Bet:</span>
+            <span class="strategy-label">Target Bet / Odds:</span>
             <span id="strat-amount" class="amount-badge">0 Chips</span>
           </div>
           <p id="strat-reason" class="strategy-reason">
