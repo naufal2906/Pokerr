@@ -5,9 +5,9 @@ class PokerApp {
   constructor() {
     this.holeCards = [null, null];
     this.communityCards = [null, null, null, null, null];
-    this.activeSlot = null; // { type: 'hole'|'community', index: number }
-    this.currentPot = 1000;  // Default awal pot
-    this.opponentBet = 0;    // Default awal bet/raise lawan
+    this.activeSlot = null;
+    this.currentPot = 1000;
+    this.opponentBet = 0;
 
     this.initDOM();
     this.renderInitialSlots();
@@ -46,7 +46,6 @@ class PokerApp {
     this.stratAmount = document.getElementById('strat-amount');
     this.stratReason = document.getElementById('strat-reason');
     
-    // INPUT DOM POT ODDS
     this.potInput = document.getElementById('pot-size-input');
     this.opponentBetInput = document.getElementById('opponent-bet-input');
 
@@ -116,7 +115,6 @@ class PokerApp {
 
   bindEvents() {
     document.addEventListener('click', (e) => {
-      // FITUR HAPUS SATUAN (×)
       if (e.target.classList.contains('remove-card-btn')) {
         e.stopPropagation();
         const cardSlot = e.target.closest('.card');
@@ -288,6 +286,7 @@ class PokerApp {
     return [...new Set(proj)];
   }
 
+  // FIX BUG MURNI MEJA: PEMBACAAN STRUKTUR PADA FLOP/TURN/RIVER
   getBoardOnlyAnalysis(communityCards) {
     const validComm = PokerEvaluator.getValidCards(communityCards);
     const commCount = validComm.length;
@@ -299,6 +298,7 @@ class PokerApp {
       const s = this.getCardSuitInfo(c).symbol;
       commSuits[s] = (commSuits[s] || 0) + 1;
     });
+
     const maxSuitCount = Math.max(...Object.values(commSuits));
     const rankCounts = {};
     commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
@@ -308,7 +308,8 @@ class PokerApp {
     const hasQuads = Object.values(rankCounts).some(cnt => cnt >= 4);
 
     const boardBest = PokerEvaluator.getBestHand(validComm);
-    const currentBoardCombo = boardBest.rankName.split('(')[0].trim();
+    let currentBoardCombo = boardBest.rankName.split('(')[0].trim();
+
     const possibilities = [];
 
     if (hasQuads) possibilities.push("Four of a Kind (Terbuka di Meja)");
@@ -321,37 +322,43 @@ class PokerApp {
     if (maxSuitCount >= 5) possibilities.push("Flush (Terbentuk Murni di Meja)");
     else if (maxSuitCount === 4) possibilities.push("Flush (Lawan Memegang 1 Kembang)");
     else if (maxSuitCount === 3) {
-      if (commCount < 5) possibilities.push("Flush Draw (Lawan Memegang 2 Kembang)");
-      else possibilities.push("Flush (Lawan Memegang 2 Kembang)");
+      possibilities.push(commCount < 5 ? "Flush Draw (3/5 Kembang)" : "Flush (Lawan Memegang 2 Kembang)");
     }
 
+    // FIX DETEKSI POTENSI STRAIGHT DI MEJA
     const uniqueRanks = [...new Set(commRanks)].sort((a, b) => a - b);
     if (uniqueRanks.includes(14)) uniqueRanks.unshift(1);
+
     let straightPossible = false;
     for (let target = 2; target <= 14; target++) {
       const windowCards = uniqueRanks.filter(r => r >= target - 4 && r <= target);
-      if (commCount === 5 && windowCards.length >= 3) {
-        const minW = Math.min(...windowCards);
-        const maxW = Math.max(...windowCards);
-        if (maxW - minW <= 4) { straightPossible = true; break; }
-      } else if (windowCards.length >= 3) {
-        straightPossible = true; break;
+      if (windowCards.length >= 3) {
+        straightPossible = true;
+        break;
       }
     }
-    if (straightPossible) possibilities.push("Straight");
+
+    if (straightPossible) {
+      possibilities.push("Straight");
+      if (currentBoardCombo === "High Card") {
+        currentBoardCombo = "Koneksi Straight";
+      }
+    }
+
     if (possibilities.length === 0) possibilities.push("Top Pair", "Two Pair");
 
     const stageLabel = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
     return `[${stageLabel}] Struktur Meja: <b>${currentBoardCombo}</b> | Potensi Terkuat Lawan: <b>${possibilities.join(' / ')}</b>`;
   }
 
-  // LOGIKA MATEMATIKA POT ODDS VS EQUITY DINAMIS
   getBettingAdvice(equity, myBestScore, commCount, draws, pot, oppBet) {
     let action = "CHECK / FOLD";
     let reason = "Tangan masih lemah, mainkan dengan kontrol pot minimum.";
     let betChips = "0 Chips";
 
-    // 1. PRE-FLOP
+    const validHole = PokerEvaluator.getValidCards(this.holeCards);
+    const validComm = PokerEvaluator.getValidCards(this.communityCards);
+
     if (commCount === 0) {
       if (oppBet > 0) {
         const reqOdds = Math.round((oppBet / (pot + oppBet * 2)) * 100);
@@ -382,11 +389,39 @@ class PokerApp {
       return { action, reason, betChips };
     }
 
-    // 2. POST-FLOP (FLOP / TURN / RIVER) SAAT LAWAN BET / RAISE > 0
+    const hasOverCards = validHole.some(hCard => {
+      const hVal = hCard.rank ? hCard.rank.value : hCard.value;
+      return validComm.every(cCard => {
+        const cVal = cCard.rank ? cCard.rank.value : cCard.value;
+        return hVal > cVal;
+      });
+    });
+
     if (oppBet > 0) {
       const totalPotAfterBet = pot + oppBet;
       const requiredEquity = Math.round((oppBet / (totalPotAfterBet + oppBet)) * 100);
       const stageName = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
+
+      if (commCount === 3 && draws.length > 0 && hasOverCards) {
+        action = "CALL / HERO CALL (BLUFF CATCH)";
+        reason = `⚡ <b>BLUFF CATCHER DETECTED [${stageName}]:</b> Lawan Raise/All-In ${oppBet} Chips. Memegang <b>Draw + Overcards (A/K)</b> memberi Anda total ekuitas riil sangat tinggi (~50%+) untuk merusak gertakan lawan!`;
+        betChips = `Call ${oppBet} Chips`;
+        return { action, reason, betChips };
+      }
+
+      if (draws.length === 0 && myBestScore <= 2) {
+        if (hasOverCards) {
+          action = "FOLD (MISSED FLOP)";
+          reason = `⚠️ <b>MISSED FLOP (A/K MELENYAP):</b> Peluang Anda hanya berharap keluar As/King di Turn/River (<b>~13% Outs</b>). Membayar ${oppBet} Chips mengejar 1 kartu adalah kerugian matematis (-EV). Disarankan <b>FOLD</b>!`;
+          betChips = "Fold";
+          return { action, reason, betChips };
+        } else if (myBestScore === 2) {
+          action = "FOLD (UNDERPAIR)";
+          reason = `🚨 <b>POCKET PAIR TERHIMPIT:</b> Ada kartu komunitas yang lebih tinggi dari Pocket Pair Anda. Peluang mengincar Set tinggal <b>~8% (2 Outs)</b>. Jangan bayar taruhan ${oppBet} Chips lawan!`;
+          betChips = "Fold";
+          return { action, reason, betChips };
+        }
+      }
 
       if (equity >= requiredEquity) {
         action = "CALL (WORTH IT)";
@@ -400,7 +435,6 @@ class PokerApp {
       return { action, reason, betChips };
     }
 
-    // 3. POST-FLOP SAAT LAWAN CHECK (OPPONENT BET = 0)
     if (myBestScore >= 7) {
       action = "ALL-IN / VALUE BET";
       reason = "Kombinasi Monster terbentuk! Lakukan Value Bet besar untuk memancing pot.";
@@ -486,7 +520,6 @@ class PokerApp {
       } else comboBadgeContainer.innerHTML = '';
     }
 
-    // KALKULASI POT ODDS & AKSI
     const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
     const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws, this.currentPot, this.opponentBet);
 
