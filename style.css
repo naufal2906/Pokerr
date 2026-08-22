@@ -34,23 +34,62 @@ body {
   min-height: 100vh;
 }
 
-/* Container Efek RGB Glow Presisi Modern */
+/* ANIMASI RGB RUNNING BORDER BERGERAK MEWAH */
+@keyframes rgbGlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
 .rgb-card-container {
   position: relative;
   border-radius: 20px;
-  padding: 2px;
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.6), rgba(247, 0, 255, 0.4), rgba(0, 255, 102, 0.5));
-  background-size: 200% 200%;
-  animation: rgbGlow 8s ease infinite;
+  padding: 3px; /* Ketebalan border RGB */
+  background: linear-gradient(
+    60deg, 
+    #ff0055, 
+    #7600ff, 
+    #00f0ff, 
+    #00ff87, 
+    #ffca28, 
+    #ff0055
+  );
+  background-size: 300% 300%;
+  animation: rgbGlow 3.5s ease infinite; /* Kecepatan gerakan lampu (3.5 detik) */
   max-width: 520px;
   width: 100%;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
 }
 
-@keyframes rgbGlow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+/* EFEK PANCARAN GLOW CAHAYA NEON DI BELAKANG CONTAINER */
+.rgb-card-container::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 22px;
+  background: linear-gradient(
+    60deg, 
+    #ff0055, 
+    #7600ff, 
+    #00f0ff, 
+    #00ff87, 
+    #ffca28, 
+    #ff0055
+  );
+  background-size: 300% 300%;
+  animation: rgbGlow 3.5s ease infinite;
+  z-index: -1;
+  filter: blur(10px);
+  opacity: 0.6;
 }
 
 .main-card {
@@ -60,6 +99,8 @@ body {
   border-radius: 18px;
   padding: 20px 14px;
   text-align: center;
+  position: relative;
+  z-index: 1;
 }
 
 .glow-title {
@@ -177,28 +218,6 @@ h2 {
   background: rgba(0, 240, 255, 0.06);
 }
 
-.card.filled::after {
-  content: "×";
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background: var(--danger-color);
-  color: #fff;
-  border-radius: 50%;
-  width: 18px;
-  height: 18px;
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.card.filled:hover::after {
-  opacity: 1;
-}
-
 .card.red { color: #e11d48; }
 .card.black { color: #0f172a; }
 
@@ -295,7 +314,6 @@ h2 {
   border-left: 3px solid var(--accent-color);
 }
 
-/* FITUR BARU: TOMBOL HIJAU INDIKATOR KOMBO & BET SIZE */
 .combo-green-badge {
   display: flex;
   align-items: center;
@@ -315,30 +333,6 @@ h2 {
 
 .combo-green-badge .badge-icon {
   font-size: 1rem;
-}
-
-.bet-chip-recommendation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(0, 240, 255, 0.08);
-  border: 1px solid rgba(0, 240, 255, 0.25);
-  padding: 10px 12px;
-  border-radius: 10px;
-  margin-top: 10px;
-}
-
-.bet-label {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.bet-amount {
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: var(--warning-color);
-  text-shadow: 0 0 8px rgba(255, 202, 40, 0.3);
 }
 
 @keyframes fadeIn {
