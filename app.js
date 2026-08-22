@@ -1,288 +1,302 @@
-import { Card, RANKS, SUITS } from './card.js';
+import { Card, SUITS, RANKS } from './card.js';
 import { PokerEvaluator } from './evaluator.js';
-import { PokerStrategy } from './strategy.js';
 
-let currentHand = [null, null];
-let currentCommunity = [null, null, null, null, null];
-let activeTarget = { type: 'hand', index: 0 };
+class PokerApp {
+  constructor() {
+    this.holeCards = [null, null];
+    this.communityCards = [null, null, null, null, null];
+    this.activeSlot = null; // { type: 'hole'|'community', index: number }
 
-function createFilledCardUI(card, onClickRemove) {
-  const cardDiv = document.createElement('div');
-  cardDiv.className = `card filled ${card.suit.color}`;
-  cardDiv.innerHTML = `
-    <div>${card.rank.label}</div>
-    <div style="text-align: center;">${card.suit.symbol}</div>
-  `;
-  cardDiv.title = "Klik untuk menghapus kartu";
-  cardDiv.addEventListener('click', onClickRemove);
-  return cardDiv;
-}
-
-function createPlaceholderUI(onClickOpen) {
-  const cardDiv = document.createElement('div');
-  cardDiv.className = "card placeholder";
-  cardDiv.innerText = "+";
-  cardDiv.title = "Klik untuk menambahkan kartu";
-  cardDiv.addEventListener('click', onClickOpen);
-  return cardDiv;
-}
-
-function updateEvaluation() {
-  const activeHandCards = currentHand.filter(c => c !== null);
-  const activeCommunityCards = currentCommunity.filter(c => c !== null);
-  const totalCards = [...activeHandCards, ...activeCommunityCards];
-
-  // 1. Evaluasi Kartu Tangan Murni
-  const holeOnlyEl = document.getElementById('hole-only-hand');
-  if (holeOnlyEl) {
-    holeOnlyEl.innerText = PokerEvaluator.evaluateHoleCardsOnly(activeHandCards);
+    this.initDOM();
+    this.bindEvents();
+    this.render();
   }
 
-  // 2. Evaluasi Tangan + Meja
-  const myBest = PokerEvaluator.getBestHand(totalCards);
-  const myBestEl = document.getElementById('my-best-hand');
-  if (myBestEl) {
-    myBestEl.innerText = myBest ? myBest.rankName : '-';
-  }
-
-  const percentage = PokerEvaluator.calculateStrength(activeHandCards, activeCommunityCards);
-  const strengthBar = document.getElementById('strength-bar');
-  const strengthPercent = document.getElementById('strength-percent');
-  if (strengthBar) strengthBar.style.width = `${percentage}%`;
-  if (strengthPercent) strengthPercent.innerText = `${percentage}%`;
-
-  // 3. Render Notifikasi Potensi Draw (Straight/Flush Draw)
-  const draws = PokerEvaluator.detectDraws(activeHandCards, activeCommunityCards);
-  let drawNoticeEl = document.getElementById('draw-notice-container');
-  if (!drawNoticeEl) {
-    drawNoticeEl = document.createElement('div');
-    drawNoticeEl.id = 'draw-notice-container';
-    drawNoticeEl.style.cssText = 'margin: 8px 0; font-size: 0.85rem; color: #00f2fe;';
-    const stratBox = document.getElementById('strat-reason')?.parentNode;
-    if (stratBox) stratBox.insertBefore(drawNoticeEl, document.getElementById('strat-reason'));
-  }
-  if (drawNoticeEl) {
-    drawNoticeEl.innerHTML = draws.length > 0 ? draws.join('<br>') : '';
-  }
-
-  // 4. Analisis Potensi Ancaman & Counter Kartu Terkuat (The Nuts)
-  const threatContainer = document.getElementById('board-threats');
-  if (threatContainer) {
-    threatContainer.innerHTML = '';
-    const threats = PokerEvaluator.analyzeBoardThreats(activeCommunityCards, activeHandCards);
+  initDOM() {
+    this.holeSlots = document.querySelectorAll('#hole-cards .card');
+    this.communitySlots = document.querySelectorAll('#community-cards .card');
+    this.holeDesc = document.getElementById('hole-desc');
+    this.handComboDesc = document.getElementById('hand-combo-desc');
+    this.equityFill = document.getElementById('equity-fill');
+    this.equityText = document.getElementById('equity-text');
+    this.comboBadgeContainer = document.getElementById('combo-badge-container'); // Container Tombol Hijau Kombinasi
     
-    threats.forEach(t => {
-      const div = document.createElement('div');
-      let color = '#ff4d4d'; // Merah untuk (v)
-      let symbol = '▼';
+    this.actionBadge = document.getElementById('action-badge');
+    this.strategyReason = document.getElementById('strategy-reason');
+    this.betAdviceBox = document.getElementById('bet-advice-box'); // Container Saran Bet Size
+    
+    this.threatContainer = document.getElementById('threat-container');
+    this.bestHandGlow = document.getElementById('best-hand-glow');
 
-      if (t.indicator === '^') {
-        color = '#00ff87'; // Hijau untuk (^)
-        symbol = '▲';
-      } else if (t.indicator === '=') {
-        color = '#ffca28'; // Kuning untuk (=)
-        symbol = '〓';
+    this.modal = document.getElementById('card-modal');
+    this.modalGrid = document.getElementById('modal-card-grid');
+    this.btnCloseModal = document.getElementById('btn-close-modal');
+    this.btnResetHole = document.getElementById('btn-reset-hole');
+    this.btnResetComm = document.getElementById('btn-reset-comm');
+
+    this.generateModalCardGrid();
+  }
+
+  generateModalCardGrid() {
+    if (!this.modalGrid) return;
+    this.modalGrid.innerHTML = '';
+
+    const suits = [SUITS.SPADES, SUITS.HEARTS, SUITS.CLUBS, SUITS.DIAMONDS];
+    suits.forEach(suit => {
+      const row = document.createElement('div');
+      row.className = 'suit-row';
+
+      const label = document.createElement('div');
+      label.className = `suit-label ${suit.color}`;
+      label.textContent = suit.symbol;
+      row.appendChild(label);
+
+      const rankContainer = document.createElement('div');
+      rankContainer.className = 'rank-buttons';
+
+      RANKS.forEach(rank => {
+        const btn = document.createElement('button');
+        btn.className = `btn-card-select ${suit.color}`;
+        btn.textContent = rank.label;
+        btn.dataset.suit = suit.symbol;
+        btn.dataset.rank = rank.label;
+
+        btn.addEventListener('click', () => {
+          this.selectCard(new Card(suit, rank));
+        });
+
+        rankContainer.appendChild(btn);
+      });
+
+      row.appendChild(rankContainer);
+      this.modalGrid.appendChild(row);
+    });
+  }
+
+  bindEvents() {
+    this.holeSlots.forEach((slot, idx) => {
+      slot.addEventListener('click', () => this.openModal('hole', idx));
+    });
+
+    this.communitySlots.forEach((slot, idx) => {
+      slot.addEventListener('click', () => this.openModal('community', idx));
+    });
+
+    if (this.btnCloseModal) {
+      this.btnCloseModal.addEventListener('click', () => this.closeModal());
+    }
+
+    if (this.btnResetHole) {
+      this.btnResetHole.addEventListener('click', () => {
+        this.holeCards = [null, null];
+        this.render();
+      });
+    }
+
+    if (this.btnResetComm) {
+      this.btnResetComm.addEventListener('click', () => {
+        this.communityCards = [null, null, null, null, null];
+        this.render();
+      });
+    }
+  }
+
+  openModal(type, index) {
+    this.activeSlot = { type, index };
+    this.updateModalButtonsState();
+    this.modal.classList.remove('hidden');
+  }
+
+  closeModal() {
+    this.modal.classList.add('hidden');
+    this.activeSlot = null;
+  }
+
+  updateModalButtonsState() {
+    const selectedCards = [...this.holeCards, ...this.communityCards].filter(Boolean);
+    const buttons = this.modalGrid.querySelectorAll('.btn-card-select');
+
+    buttons.forEach(btn => {
+      const s = btn.dataset.suit;
+      const r = btn.dataset.rank;
+      const isUsed = selectedCards.some(c => (c.suit.symbol === s || c.suit === s) && (c.rank.label === r || c.label === r));
+
+      if (isUsed) {
+        btn.classList.add('disabled');
+      } else {
+        btn.classList.remove('disabled');
       }
+    });
+  }
 
-      div.className = `potential-item ${t.safe ? 'safe' : ''}`;
-      div.innerHTML = `
-        <div style="font-weight:bold; font-size:1.05rem; margin-bottom:6px; color:${color};">
-          ${symbol} ${t.text} (${t.indicator})
-        </div>
-        <div style="font-size:0.85rem; color:#00f2fe; margin-bottom:4px;">📊 <b>${t.boardPotential}</b></div>
-        <div style="font-size:0.85rem; color:${color};">${t.worstCase}</div>
+  selectCard(card) {
+    if (!this.activeSlot) return;
+
+    if (this.activeSlot.type === 'hole') {
+      this.holeCards[this.activeSlot.index] = card;
+    } else {
+      this.communityCards[this.activeSlot.index] = card;
+    }
+
+    this.closeModal();
+    this.render();
+  }
+
+  renderCardSlot(element, card) {
+    if (card) {
+      element.className = `card filled ${card.suit.color}`;
+      element.innerHTML = `
+        <span class="card-rank">${card.rank.label}</span>
+        <span class="card-suit">${card.suit.symbol}</span>
       `;
-      threatContainer.appendChild(div);
-    });
-  }
-
-  // 5. Kombinasi Terbaik Saat Ini
-  const resultNameEl = document.getElementById('result-name');
-  const bestGroup = document.getElementById('best-cards');
-  if (bestGroup) bestGroup.innerHTML = '';
-
-  if (totalCards.length > 0) {
-    if (resultNameEl) resultNameEl.innerText = myBest.rankName;
-    if (myBest.cards && myBest.cards.length > 0 && bestGroup) {
-      myBest.cards.forEach(c => bestGroup.appendChild(createFilledCardUI(c, () => {})));
+    } else {
+      element.className = 'card placeholder';
+      element.innerHTML = '+';
     }
-  } else {
-    if (resultNameEl) resultNameEl.innerText = "Masukkan Kartu Tangan / Komunitas";
   }
 
-  // 6. Pembaharuan Saran Strategi Bermain (Fitur Chips/Betting Size Dihapus)
-  const strat = PokerStrategy.getStrategy(activeHandCards, activeCommunityCards, myBest);
-  
-  const actionEl = document.getElementById('strat-action');
-  if (actionEl) {
-    actionEl.innerText = strat.action;
+  // LOGIKA STRATEGI BETTING BERDASARKAN KEKUATAN & POT ODDS
+  getBettingAdvice(equity, myBestScore, commCount, draws) {
+    let action = "CHECK / FOLD";
+    let reason = "Tangan masih lemah, mainkan dengan kontrol pot minimum.";
+    let betChips = "0 Chips (Check)";
+
+    if (commCount === 0) {
+      // PRE-FLOP STRATEGY
+      if (equity >= 75) {
+        action = "RAISE / ALL-IN";
+        reason = "[PRE-FLOP] Memegang Monster Hand! Buka Raise 3x - 5x Big Blind untuk memancing pot.";
+        betChips = "1.800 - 3.000 Chips (3x-5x BB)";
+      } else if (equity >= 50) {
+        action = "RAISE / CALL";
+        reason = "[PRE-FLOP] Kartu standar tinggi. Naikkan taruhan 2.5x BB atau Call jika ada raise kecil.";
+        betChips = "1.500 Chips (2.5x BB)";
+      } else {
+        action = "CHECK / FOLD";
+        reason = "[PRE-FLOP] Kartu relatif lemah. Buka Check jika gratis, atau Fold jika di-raise lawan.";
+        betChips = "0 Chips (Fold jika di-raise)";
+      }
+    } else {
+      // POST-FLOP STRATEGY (FLOP, TURN, RIVER)
+      if (myBestScore >= 7) { // Full House, Quads, Straight Flush
+        action = "RAISE / ALL-IN";
+        reason = "Kombinasi Monster terbentuk! Lakukan Value Bet besar / All-in untuk memaksimalkan pot.";
+        betChips = "3.000+ Chips / ALL-IN";
+      } else if (myBestScore >= 5 || equity >= 75) { // Flush, Straight, Set Tinggi
+        action = "RAISE / CALL BIG";
+        reason = "Kombinasi Kartu Jadi Sangat Kuat! Naikkan taruhan sekitar 60% - 75% ukuran Pot.";
+        betChips = "1.800 - 2.400 Chips";
+      } else if (draws.length > 0) { // Flush / Straight Draw
+        action = "CALL / BET KECIL";
+        reason = `${draws[0]} Disarankan Bet / Call kecil (25% - 35% Pot) untuk mengejar kartu jadi.`;
+        betChips = "800 - 1.200 Chips (Pengejar Draw)";
+      } else if (myBestScore >= 2 && equity >= 40) { // Top Pair / Two Pair
+        action = "CHECK / CALL";
+        reason = "Memegang Pair / Made Hand moderat. Kontrol pot dengan Check atau Call taruhan standar.";
+        betChips = "600 - 1.000 Chips";
+      } else {
+        action = "CHECK / FOLD";
+        reason = "Belum membentuk kombinasi dan tidak ada Draw potensial. Fold jika lawan bertaruh besar.";
+        betChips = "0 Chips (Check/Fold)";
+      }
+    }
+
+    return { action, reason, betChips };
+  }
+
+  render() {
+    // Render Kartu Tangan
+    this.holeSlots.forEach((slot, i) => this.renderCardSlot(slot, this.holeCards[i]));
     
-    if (strat.action.includes('RAISE') || strat.action.includes('ALL-IN')) {
-      actionEl.style.borderColor = '#00ff87';
-      actionEl.style.color = '#00ff87';
-    } else if (strat.action.includes('CALL') || strat.action.includes('BET')) {
-      actionEl.style.borderColor = '#00f2fe';
-      actionEl.style.color = '#00f2fe';
+    // Render Kartu Komunitas
+    this.communitySlots.forEach((slot, i) => this.renderCardSlot(slot, this.communityCards[i]));
+
+    // Deskripsi Hole Cards
+    this.holeDesc.textContent = PokerEvaluator.evaluateHoleCardsOnly(this.holeCards);
+
+    const validHole = PokerEvaluator.getValidCards(this.holeCards);
+    const validComm = PokerEvaluator.getValidCards(this.communityCards);
+
+    if (validHole.length < 2) {
+      this.handComboDesc.textContent = "Pilih 2 Kartu Tangan";
+      this.equityFill.style.width = "0%";
+      this.equityText.textContent = "0%";
+      this.actionBadge.textContent = "WAITING";
+      this.strategyReason.textContent = "Silakan masukkan 2 kartu tangan Anda terlebih dahulu.";
+      if (this.betAdviceBox) this.betAdviceBox.innerHTML = '';
+      if (this.comboBadgeContainer) this.comboBadgeContainer.innerHTML = '';
+      this.threatContainer.innerHTML = '';
+      this.bestHandGlow.textContent = "-";
+      return;
+    }
+
+    // Hitung Win Equity & Best Hand
+    const equity = PokerEvaluator.calculateStrength(this.holeCards, this.communityCards);
+    this.equityFill.style.width = `${equity}%`;
+    this.equityText.textContent = `${equity}%`;
+
+    const myBest = PokerEvaluator.getBestHand([...validHole, ...validComm]);
+    
+    // FIX KICKER PRE-FLOP KOSONG
+    if (validComm.length === 0 && myBest.rankName.includes('Kicker []')) {
+      this.handComboDesc.textContent = myBest.rankName.replace(' - Kicker []', '');
     } else {
-      actionEl.style.borderColor = '#ff4d4d';
-      actionEl.style.color = '#ff4d4d';
+      this.handComboDesc.textContent = myBest.rankName;
     }
-  }
 
-  // Sembunyikan elemen Estimasi Chips jika ada di HTML
-  const stratAmountEl = document.getElementById('strat-amount');
-  if (stratAmountEl) {
-    stratAmountEl.style.display = 'none';
-    if (stratAmountEl.parentElement) {
-      stratAmountEl.parentElement.style.display = 'none'; // Sembunyikan container baris Chips
+    this.bestHandGlow.textContent = myBest.rankName;
+
+    // FITUR 1: BADGES INDIKATOR KOMBINASI HIJAU (LOKASI KOMBO)
+    if (this.comboBadgeContainer) {
+      if (myBest && myBest.score >= 2) {
+        const locationText = validComm.length === 0 
+          ? "Di Tangan (Pre-Flop)" 
+          : (myBest.score >= 5 ? "Tangan + Meja (Terbentuk)" : "Di Komunitas / Tangan");
+        
+        this.comboBadgeContainer.innerHTML = `
+          <div class="combo-green-badge">
+            <span class="badge-icon">⚡</span>
+            <span>Kombinasi Aktif: <b>${myBest.rankName.split('(')[0]}</b> [${locationText}]</span>
+          </div>
+        `;
+      } else {
+        this.comboBadgeContainer.innerHTML = '';
+      }
     }
-  }
 
-  const stratReasonEl = document.getElementById('strat-reason');
-  if (stratReasonEl) {
-    stratReasonEl.innerText = strat.reason || 'Masukkan kartu untuk mendapatkan saran strategi.';
-  }
-}
+    // FITUR 2: SUGGESTION BET SIZE & STRATEGI
+    const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
+    const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws);
 
-function renderBoard() {
-  const handContainer = document.getElementById('hand-cards');
-  const commContainer = document.getElementById('community-cards');
+    this.actionBadge.textContent = advice.action;
+    this.strategyReason.textContent = advice.reason;
 
-  if (handContainer) handContainer.innerHTML = '';
-  if (commContainer) commContainer.innerHTML = '';
-
-  currentHand.forEach((card, index) => {
-    if (!handContainer) return;
-    if (card) {
-      handContainer.appendChild(createFilledCardUI(card, () => {
-        currentHand[index] = null;
-        renderBoard();
-      }));
-    } else {
-      handContainer.appendChild(createPlaceholderUI(() => openPicker('hand', index)));
+    if (this.betAdviceBox) {
+      this.betAdviceBox.innerHTML = `
+        <div class="bet-chip-recommendation">
+          <span class="bet-label">💰 Estimasi Ukuran Bet / Call Ideal:</span>
+          <span class="bet-amount">${advice.betChips}</span>
+        </div>
+      `;
     }
-  });
 
-  currentCommunity.forEach((card, index) => {
-    if (!commContainer) return;
-    if (card) {
-      commContainer.appendChild(createFilledCardUI(card, () => {
-        currentCommunity[index] = null;
-        renderBoard();
-      }));
-    } else {
-      commContainer.appendChild(createPlaceholderUI(() => openPicker('community', index)));
-    }
-  });
+    // FITUR 3: THREAT ANALYSIS & WORST-CASE
+    const threats = PokerEvaluator.analyzeBoardThreats(this.communityCards, this.holeCards);
+    this.threatContainer.innerHTML = '';
 
-  updateEvaluation();
-}
-
-// Reset Hand & Community
-document.getElementById('btn-clear-hand')?.addEventListener('click', () => {
-  currentHand = [null, null];
-  renderBoard();
-});
-
-document.getElementById('btn-clear-comm')?.addEventListener('click', () => {
-  currentCommunity = [null, null, null, null, null];
-  renderBoard();
-});
-
-// Modal Picker (8 Baris)
-const modal = document.getElementById('card-picker-modal');
-const fullCardGrid = document.getElementById('full-card-grid');
-
-function openPicker(type, index) {
-  activeTarget = { type, index };
-  const targetLabel = document.getElementById('target-label');
-  if (targetLabel) {
-    targetLabel.innerText = type === 'hand' ? `Tangan Slot #${index + 1}` : `Komunitas Slot #${index + 1}`;
-  }
-
-  renderFullCardGrid();
-  if (modal) modal.classList.remove('hidden');
-}
-
-function renderFullCardGrid() {
-  if (!fullCardGrid) return;
-  fullCardGrid.innerHTML = '';
-
-  const chosenCards = [...currentHand, ...currentCommunity].filter(c => c !== null);
-  const suits = [SUITS.SPADES, SUITS.HEARTS, SUITS.CLUBS, SUITS.DIAMONDS];
-  
-  const allRanks = [...RANKS].reverse(); 
-  const ranksHigh = allRanks.slice(0, 7); // A - 8
-  const ranksLow = allRanks.slice(7);     // 7 - 2
-
-  suits.forEach(suit => {
-    // Baris 1: High Cards
-    const row1 = document.createElement('div');
-    row1.className = 'suit-row';
-
-    const label1 = document.createElement('div');
-    label1.className = `suit-label ${suit.color}`;
-    label1.innerText = suit.symbol;
-    row1.appendChild(label1);
-
-    ranksHigh.forEach(rank => {
-      const btn = createPickerButton(rank, suit, chosenCards);
-      row1.appendChild(btn);
+    threats.forEach(t => {
+      const item = document.createElement('div');
+      item.className = `potential-item ${t.safe ? 'safe' : ''}`;
+      item.innerHTML = `
+        <div class="threat-title">${t.text}</div>
+        <div style="margin:4px 0;">📊 <b>${t.boardPotential}</b></div>
+        <div>${t.worstCase}</div>
+      `;
+      this.threatContainer.appendChild(item);
     });
-    fullCardGrid.appendChild(row1);
-
-    // Baris 2: Low Cards
-    const row2 = document.createElement('div');
-    row2.className = 'suit-row';
-
-    const label2 = document.createElement('div');
-    label2.className = 'suit-label';
-    label2.innerText = '';
-    row2.appendChild(label2);
-
-    ranksLow.forEach(rank => {
-      const btn = createPickerButton(rank, suit, chosenCards);
-      row2.appendChild(btn);
-    });
-    fullCardGrid.appendChild(row2);
-  });
-}
-
-function createPickerButton(rank, suit, chosenCards) {
-  const btn = document.createElement('button');
-  btn.className = `btn-card-select ${suit.color}`;
-  btn.innerText = rank.label;
-
-  const isUsed = chosenCards.some(
-    c => c.rank.value === rank.value && (c.suit.symbol || c.suit) === suit.symbol
-  );
-
-  if (isUsed) {
-    btn.classList.add('disabled');
-    btn.disabled = true;
-  } else {
-    btn.addEventListener('click', () => selectCard(rank, suit));
   }
-
-  return btn;
 }
 
-function selectCard(rank, suit) {
-  const newCard = new Card(rank, suit);
-
-  if (activeTarget.type === 'hand') {
-    currentHand[activeTarget.index] = newCard;
-  } else {
-    currentCommunity[activeTarget.index] = newCard;
-  }
-
-  if (modal) modal.classList.add('hidden');
-  renderBoard();
-}
-
-document.getElementById('close-modal')?.addEventListener('click', () => {
-  if (modal) modal.classList.add('hidden');
+document.addEventListener('DOMContentLoaded', () => {
+  window.app = new PokerApp();
 });
-
-// Inisialisasi Tampilan Awal
-renderBoard();
