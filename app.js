@@ -214,6 +214,31 @@ class PokerApp {
     }
   }
 
+  // LOGIKA HITUNG DRAFT PROYEKSI KARTU TANGAN (REVISI 1)
+  getHoleCardProjections(holeCards) {
+    const valid = PokerEvaluator.getValidCards(holeCards);
+    if (valid.length < 2) return [];
+
+    const v1 = valid[0].rank ? valid[0].rank.value : valid[0].value;
+    const v2 = valid[1].rank ? valid[1].rank.value : valid[1].value;
+    const s1 = this.getCardSuitInfo(valid[0]).symbol;
+    const s2 = this.getCardSuitInfo(valid[1]).symbol;
+
+    const projections = [];
+
+    if (v1 === v2) {
+      // Pocket Pair
+      projections.push("Set (Three of a Kind)", "Full House", "Four of a Kind (Quads)", "Two Pair");
+    } else {
+      // Non-Pair
+      if (s1 === s2) projections.push("Flush / Flush Draw");
+      if (Math.abs(v1 - v2) <= 4) projections.push("Straight / Straight Draw");
+      projections.push("Top Pair / Two Pair");
+    }
+
+    return projections;
+  }
+
   getBettingAdvice(equity, myBestScore, commCount, draws) {
     let action = "CHECK / FOLD";
     let reason = "Tangan masih lemah, mainkan dengan kontrol pot minimum.";
@@ -274,9 +299,27 @@ class PokerApp {
     const validHole = PokerEvaluator.getValidCards(this.holeCards);
     const validComm = PokerEvaluator.getValidCards(this.communityCards);
 
-    // KARTU TANGAN INFO
     if (this.holeOnlyHand) {
       this.holeOnlyHand.textContent = PokerEvaluator.evaluateHoleCardsOnly(this.holeCards);
+    }
+
+    // REVISI 1: TAMPILKAN DAFTAR PROYEKSI KARTU TANGAN
+    let holeProjectionContainer = document.getElementById('hole-projection-badge-element');
+    if (!holeProjectionContainer && this.handCardsContainer) {
+      holeProjectionContainer = document.createElement('div');
+      holeProjectionContainer.id = 'hole-projection-badge-element';
+      this.handCardsContainer.after(holeProjectionContainer);
+    }
+
+    if (validHole.length === 2 && holeProjectionContainer) {
+      const projections = this.getHoleCardProjections(this.holeCards);
+      holeProjectionContainer.innerHTML = `
+        <div class="combo-green-badge" style="background: rgba(0, 240, 255, 0.08); border-color: rgba(0, 240, 255, 0.3); color: #00f0ff;">
+          <span>🎯 Proyeksi Kombinasi Tangan: <b>${projections.join(' / ')}</b></span>
+        </div>
+      `;
+    } else if (holeProjectionContainer) {
+      holeProjectionContainer.innerHTML = '';
     }
 
     if (validHole.length < 2) {
@@ -297,8 +340,7 @@ class PokerApp {
     if (this.strengthPercent) this.strengthPercent.textContent = `${equity}%`;
 
     const myBest = PokerEvaluator.getBestHand([...validHole, ...validComm]);
-    const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
-
+    
     let comboText = myBest.rankName;
     if (validComm.length === 0 && comboText.includes('- Kicker []')) {
       comboText = comboText.replace(' - Kicker []', '');
@@ -307,7 +349,7 @@ class PokerApp {
     if (this.myBestHand) this.myBestHand.textContent = comboText;
     if (this.resultName) this.resultName.textContent = comboText;
 
-    // BADGE HIJAU DINAMIS UNTUK FLOP (3 KARTU) SAMPAI RIVER
+    // REVISI 2: TOMBOL HIJAU MURNI UNTUK KARTU KOMUNITAS (BOARD ONLY)
     let comboBadgeContainer = document.getElementById('combo-green-badge-element');
     if (!comboBadgeContainer && this.communityCardsContainer) {
       comboBadgeContainer = document.createElement('div');
@@ -316,26 +358,28 @@ class PokerApp {
     }
 
     if (comboBadgeContainer) {
-      if (myBest && myBest.score >= 5) { // Kombinasi Sudah Jadi (Straight / Flush / Full House)
+      if (validComm.length >= 3) {
+        // Evaluasi MURNI KARTU KOMUNITAS (Board Only)
+        const boardOnlyBest = PokerEvaluator.getBestHand(validComm);
+        let boardComboName = boardOnlyBest.rankName.split('(')[0].trim();
+
+        // Cek struktur kembang/urutan murni meja
+        const suitCounts = {};
+        validComm.forEach(c => {
+          const s = this.getCardSuitInfo(c).symbol;
+          suitCounts[s] = (suitCounts[s] || 0) + 1;
+        });
+        const maxSuit = Math.max(...Object.values(suitCounts));
+
+        let boardPotentialTxt = `Struktur Meja: ${boardComboName}`;
+        if (maxSuit >= 3) {
+          boardPotentialTxt += ` + Potensi Flush (${maxSuit}/5 Kembang Sama)`;
+        }
+
         comboBadgeContainer.innerHTML = `
           <div class="combo-green-badge">
             <span class="badge-icon">⚡</span>
-            <span>Kombinasi Aktif: <b>${comboText.split('(')[0]}</b> [Tangan + Meja (Terbentuk)]</span>
-          </div>
-        `;
-      } else if (draws.length > 0) { // Flop 3 Kartu Ada Draw (Flush / Straight Draw)
-        const drawText = draws[0].replace(/<\/?[^>]+(>|$)/g, "");
-        comboBadgeContainer.innerHTML = `
-          <div class="combo-green-badge" style="background: rgba(0, 240, 255, 0.15); border-color: rgba(0, 240, 255, 0.5); color: #00f0ff;">
-            <span class="badge-icon">🎯</span>
-            <span>Potensi Proyeksi Aktif: <b>${drawText}</b></span>
-          </div>
-        `;
-      } else if (myBest && myBest.score >= 2) { // Pair / Two Pair
-        comboBadgeContainer.innerHTML = `
-          <div class="combo-green-badge">
-            <span class="badge-icon">⚡</span>
-            <span>Kombinasi Aktif: <b>${comboText.split('(')[0]}</b></span>
+            <span>Potensi Murni Meja (Board Only): <b>${boardPotentialTxt}</b></span>
           </div>
         `;
       } else {
@@ -343,6 +387,7 @@ class PokerApp {
       }
     }
 
+    const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
     const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws);
 
     if (this.stratAction) this.stratAction.textContent = advice.action;
