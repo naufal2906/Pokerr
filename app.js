@@ -14,27 +14,22 @@ class PokerApp {
   }
 
   initDOM() {
-    // DOM Containers Sesuai ID di index.html Anda
     this.handCardsContainer = document.getElementById('hand-cards');
     this.communityCardsContainer = document.getElementById('community-cards');
     this.bestCardsContainer = document.getElementById('best-cards');
 
-    // Text & Stats
     this.holeOnlyHand = document.getElementById('hole-only-hand');
     this.myBestHand = document.getElementById('my-best-hand');
     this.strengthBar = document.getElementById('strength-bar');
     this.strengthPercent = document.getElementById('strength-percent');
 
-    // Strategy Section
     this.stratAction = document.getElementById('strat-action');
     this.stratAmount = document.getElementById('strat-amount');
     this.stratReason = document.getElementById('strat-reason');
 
-    // Threat & Results Section
     this.boardThreats = document.getElementById('board-threats');
     this.resultName = document.getElementById('result-name');
 
-    // Buttons & Modal
     this.btnClearHand = document.getElementById('btn-clear-hand');
     this.btnClearComm = document.getElementById('btn-clear-comm');
     this.modal = document.getElementById('card-picker-modal');
@@ -45,7 +40,6 @@ class PokerApp {
     this.generateModalCardGrid();
   }
 
-  // Buat Slot Kartu Dinamis di HTML
   renderInitialSlots() {
     if (this.handCardsContainer) {
       this.handCardsContainer.innerHTML = `
@@ -90,7 +84,8 @@ class PokerApp {
         btn.dataset.rank = rank.label;
 
         btn.addEventListener('click', () => {
-          this.selectCard(new Card(suit, rank));
+          // PERBAIKAN URUTAN PARAMETER: (rank, suit) SESUAI CONSTRUCTOR card.js
+          this.selectCard(new Card(rank, suit));
         });
 
         rankContainer.appendChild(btn);
@@ -152,7 +147,7 @@ class PokerApp {
     buttons.forEach(btn => {
       const s = btn.dataset.suit;
       const r = btn.dataset.rank;
-      const isUsed = selectedCards.some(c => (c.suit.symbol === s || c.suit === s) && (c.rank.label === r || c.label === r));
+      const isUsed = selectedCards.some(c => c && c.suit.symbol === s && c.rank.label === r);
 
       if (isUsed) {
         btn.classList.add('disabled');
@@ -177,12 +172,11 @@ class PokerApp {
 
   renderCardSlot(element, card) {
     if (!element) return;
-    if (card) {
-      const suitColor = card.suit.color || (card.suit.symbol === '♥' || card.suit.symbol === '♦' ? 'red' : 'black');
-      element.className = `card filled ${suitColor}`;
+    if (card && card.rank && card.suit) {
+      element.className = `card filled ${card.suit.color}`;
       element.innerHTML = `
-        <span class="card-rank">${card.rank.label || card.label}</span>
-        <span class="card-suit">${card.suit.symbol || card.suit}</span>
+        <span class="card-rank">${card.rank.label}</span>
+        <span class="card-suit">${card.suit.symbol}</span>
       `;
     } else {
       element.className = 'card placeholder';
@@ -190,7 +184,6 @@ class PokerApp {
     }
   }
 
-  // KALKULATOR BET SIZE CHIPS & STRATEGI
   getBettingAdvice(equity, myBestScore, commCount, draws) {
     let action = "CHECK / FOLD";
     let reason = "Tangan masih lemah, mainkan dengan kontrol pot minimum.";
@@ -238,13 +231,11 @@ class PokerApp {
   }
 
   render() {
-    // Render Hole Slots
     if (this.handCardsContainer) {
       const slots = this.handCardsContainer.querySelectorAll('.card');
       slots.forEach((slot, i) => this.renderCardSlot(slot, this.holeCards[i]));
     }
 
-    // Render Community Slots
     if (this.communityCardsContainer) {
       const slots = this.communityCardsContainer.querySelectorAll('.card');
       slots.forEach((slot, i) => this.renderCardSlot(slot, this.communityCards[i]));
@@ -270,14 +261,12 @@ class PokerApp {
       return;
     }
 
-    // Hitung Win Equity & Best Hand
     const equity = PokerEvaluator.calculateStrength(this.holeCards, this.communityCards);
     if (this.strengthBar) this.strengthBar.style.width = `${equity}%`;
     if (this.strengthPercent) this.strengthPercent.textContent = `${equity}%`;
 
     const myBest = PokerEvaluator.getBestHand([...validHole, ...validComm]);
     
-    // Perbaikan Bug Kicker Pre-Flop Kosong
     let comboText = myBest.rankName;
     if (validComm.length === 0 && comboText.includes('- Kicker []')) {
       comboText = comboText.replace(' - Kicker []', '');
@@ -286,7 +275,7 @@ class PokerApp {
     if (this.myBestHand) this.myBestHand.textContent = comboText;
     if (this.resultName) this.resultName.textContent = comboText;
 
-    // FITUR 1: TOMBOL/BADGE HIJAU INDIKATOR KOMBINASI DIBUAT DENGAN TAG ELEMEN
+    // FITUR BADGE KOMBINASI HIJAU BARU
     let comboBadgeContainer = document.getElementById('combo-green-badge-element');
     if (!comboBadgeContainer && this.communityCardsContainer) {
       comboBadgeContainer = document.createElement('div');
@@ -297,7 +286,7 @@ class PokerApp {
     if (comboBadgeContainer) {
       if (myBest && myBest.score >= 2) {
         const locationText = validComm.length === 0 
-          ? "Di Tangan (Pre-Flop)" 
+          ? "Pre-Flop (Di Tangan)" 
           : (myBest.score >= 5 ? "Tangan + Meja (Terbentuk)" : "Di Komunitas / Tangan");
         
         comboBadgeContainer.innerHTML = `
@@ -311,7 +300,6 @@ class PokerApp {
       }
     }
 
-    // FITUR 2: STRATEGI & ESTIMASI CHIPS BET
     const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
     const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws);
 
@@ -319,7 +307,6 @@ class PokerApp {
     if (this.stratAmount) this.stratAmount.textContent = advice.betChips;
     if (this.stratReason) this.stratReason.textContent = advice.reason;
 
-    // FITUR 3: ANALISIS ANCAMAN MEJA
     const threats = PokerEvaluator.analyzeBoardThreats(this.communityCards, this.holeCards);
     if (this.boardThreats) {
       this.boardThreats.innerHTML = '';
@@ -335,7 +322,6 @@ class PokerApp {
       });
     }
 
-    // Render 5 Kartu Terbaik di Bagian Bawah
     if (this.bestCardsContainer && myBest.cards) {
       this.bestCardsContainer.innerHTML = '';
       myBest.cards.forEach(c => {
