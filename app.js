@@ -6,8 +6,6 @@ class PokerApp {
     this.holeCards = [null, null];
     this.communityCards = [null, null, null, null, null];
     this.activeSlot = null;
-    this.currentPot = 1000;
-    this.opponentBet = 0;
 
     this.initDOM();
     this.renderInitialSlots();
@@ -44,10 +42,8 @@ class PokerApp {
 
     this.stratAction = document.getElementById('strat-action');
     this.stratAmount = document.getElementById('strat-amount');
+    this.maxCallProb = document.getElementById('max-call-prob'); // Selector Probabilitas Call
     this.stratReason = document.getElementById('strat-reason');
-    
-    this.potInput = document.getElementById('pot-size-input');
-    this.opponentBetInput = document.getElementById('opponent-bet-input');
 
     this.boardThreats = document.getElementById('board-threats');
     this.resultName = document.getElementById('result-name');
@@ -136,20 +132,6 @@ class PokerApp {
       }
     });
 
-    if (this.potInput) {
-      this.potInput.addEventListener('input', (e) => {
-        this.currentPot = parseInt(e.target.value) || 0;
-        this.render();
-      });
-    }
-
-    if (this.opponentBetInput) {
-      this.opponentBetInput.addEventListener('input', (e) => {
-        this.opponentBet = parseInt(e.target.value) || 0;
-        this.render();
-      });
-    }
-
     if (this.closeModalBtn) this.closeModalBtn.addEventListener('click', () => this.closeModal());
 
     if (this.btnClearHand) {
@@ -235,6 +217,7 @@ class PokerApp {
     }
   }
 
+  // PROYEKSI KARTU TANGAN DENGAN ANGKA/KEMBANG DETIL
   getDynamicHoleProjections(holeCards, communityCards) {
     const validHole = PokerEvaluator.getValidCards(holeCards);
     const validComm = PokerEvaluator.getValidCards(communityCards);
@@ -250,15 +233,15 @@ class PokerApp {
       const s1 = this.getCardSuitInfo(validHole[0]).symbol;
       const s2 = this.getCardSuitInfo(validHole[1]).symbol;
 
-      if (v1 === v2) return ["Set (Trips)", "Full House", "Four of a Kind (Quads)", "Two Pair"];
+      if (v1 === v2) return ["Set (Trips)", "Full House", "Quads", "Two Pair"];
       const res = [];
-      if (s1 === s2) res.push("Flush");
+      if (s1 === s2) res.push(`Flush (${s1})`);
       if (Math.abs(v1 - v2) <= 4 || (v1 === 14 && v2 <= 5) || (v2 === 14 && v1 <= 5)) res.push("Straight");
-      res.push("Top Pair / Two Pair", "Three of a Kind");
+      res.push("Top Pair / Two Pair");
       return res;
     }
 
-    if (commCount === 5) return [`🏆 Kombinasi Final: ${myBest.rankName.split('(')[0].trim()}`];
+    if (commCount === 5) return [`🏆 Kombinasi Final: ${myBest.rankName}`];
 
     const proj = [];
     const suitCounts = {};
@@ -266,27 +249,28 @@ class PokerApp {
       const s = this.getCardSuitInfo(c).symbol;
       suitCounts[s] = (suitCounts[s] || 0) + 1;
     });
-    const maxSuit = Math.max(...Object.values(suitCounts));
 
-    if (myBest.score === 6 || myBest.score === 9 || myBest.score === 10) proj.push(`✅ ${myBest.rankName.split('(')[0].trim()}`);
-    else if (maxSuit === 4) proj.push("🌊 Flush Draw (Butuh 1 Kembang)");
+    Object.keys(suitCounts).forEach(s => {
+      const count = suitCounts[s];
+      if (count === 4) proj.push(`🌊 Flush Draw (Butuh 1 Kartu ${s} Lagi)`);
+      else if (count === 3 && commCount === 3) proj.push(`🌊 Backdoor Flush (Butuh 2 Kartu ${s} Lagi)`);
+    });
 
     const draws = PokerEvaluator.detectDraws(holeCards, communityCards);
-    const hasStraightDraw = draws.some(d => d.includes("Straight Draw"));
+    draws.forEach(d => {
+      if (d.includes("Straight Draw")) proj.push(d.replace(/<\/?[^>]+(>|$)/g, ""));
+    });
 
-    if (myBest.score === 5) proj.push(`✅ ${myBest.rankName.split('(')[0].trim()}`);
-    else if (hasStraightDraw) proj.push("🎯 Straight Draw");
-
-    if (myBest.score >= 7) proj.push(`✅ ${myBest.rankName.split('(')[0].trim()}`);
-    else if (myBest.score === 4) proj.push("Three of a Kind (Trips)", "Potensi Full House");
-    else if (myBest.score === 3) proj.push("Two Pair", "Potensi Full House");
-    else if (myBest.score === 2) proj.push("One Pair / Top Pair", "Potensi Two Pair / Trips");
-    else if (myBest.score === 1) proj.push("High Card");
+    if (myBest.score >= 5) proj.push(`✅ ${myBest.rankName}`);
+    else if (myBest.score === 4) proj.push(`Set/Trips (Potensi Full House / Quads)`);
+    else if (myBest.score === 3) proj.push(`Two Pair (Potensi Full House)`);
+    else if (myBest.score === 2) proj.push(`${myBest.rankName.split('-')[0].trim()} (Potensi Two Pair/Trips)`);
+    else if (myBest.score === 1 && proj.length === 0) proj.push("High Card (Butuh Pair di Turn/River)");
 
     return [...new Set(proj)];
   }
 
-  // FIX BUG MURNI MEJA: PEMBACAAN STRUKTUR PADA FLOP/TURN/RIVER
+  // ANALISIS STRUKTUR MEJA TERMASUK HIGH CARD & PAIR TERTIKGG
   getBoardOnlyAnalysis(communityCards) {
     const validComm = PokerEvaluator.getValidCards(communityCards);
     const commCount = validComm.length;
@@ -300,32 +284,39 @@ class PokerApp {
     });
 
     const maxSuitCount = Math.max(...Object.values(commSuits));
+    const flushSuit = Object.keys(commSuits).find(s => commSuits[s] === maxSuitCount);
+    
     const rankCounts = {};
     commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
 
-    const hasPair = Object.values(rankCounts).some(cnt => cnt >= 2);
-    const hasTrips = Object.values(rankCounts).some(cnt => cnt >= 3);
-    const hasQuads = Object.values(rankCounts).some(cnt => cnt >= 4);
+    const pairedRanks = Object.keys(rankCounts)
+      .filter(r => rankCounts[r] >= 2)
+      .map(Number)
+      .sort((a, b) => b - a);
 
-    const boardBest = PokerEvaluator.getBestHand(validComm);
-    let currentBoardCombo = boardBest.rankName.split('(')[0].trim();
+    const maxRank = commRanks[0];
+    const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
+    const maxSuitCard = validComm.find(c => (c.rank ? c.rank.value : c.value) === maxRank);
+    const maxSuitSym = maxSuitCard ? this.getCardSuitInfo(maxSuitCard).symbol : '';
+
+    let boardStructureLabel = "";
+    if (pairedRanks.length > 0) {
+      const topPairVal = pairedRanks[0];
+      const topPairLabel = topPairVal === 14 ? 'A' : topPairVal === 13 ? 'K' : topPairVal === 12 ? 'Q' : topPairVal === 11 ? 'J' : topPairVal;
+      boardStructureLabel = `Pair di Meja [${topPairLabel}${topPairLabel}]`;
+    } else {
+      boardStructureLabel = `High Card Meja [${maxLabel}${maxSuitSym}]`;
+    }
 
     const possibilities = [];
 
-    if (hasQuads) possibilities.push("Four of a Kind (Terbuka di Meja)");
-    else if (hasTrips) possibilities.push("Four of a Kind (Quads)", "Full House");
-    else if (hasPair) {
-      possibilities.push("Full House", "Three of a Kind (Trips)");
-      if (commCount < 5) possibilities.push("Two Pair");
-    }
+    if (maxSuitCount >= 5) possibilities.push(`Flush Murni di Meja (${flushSuit})`);
+    else if (maxSuitCount === 4) possibilities.push(`Flush (Lawan Cukup Pegang 1 ${flushSuit})`);
+    else if (maxSuitCount === 3) possibilities.push(`Flush Draw di Meja (3 Kartu ${flushSuit})`);
 
-    if (maxSuitCount >= 5) possibilities.push("Flush (Terbentuk Murni di Meja)");
-    else if (maxSuitCount === 4) possibilities.push("Flush (Lawan Memegang 1 Kembang)");
-    else if (maxSuitCount === 3) {
-      possibilities.push(commCount < 5 ? "Flush Draw (3/5 Kembang)" : "Flush (Lawan Memegang 2 Kembang)");
-    }
+    if (pairedRanks.length >= 2) possibilities.push("Full House / Two Pair di Meja");
+    else if (pairedRanks.length === 1) possibilities.push("Trips / Full House");
 
-    // FIX DETEKSI POTENSI STRAIGHT DI MEJA
     const uniqueRanks = [...new Set(commRanks)].sort((a, b) => a - b);
     if (uniqueRanks.includes(14)) uniqueRanks.unshift(1);
 
@@ -338,123 +329,69 @@ class PokerApp {
       }
     }
 
-    if (straightPossible) {
-      possibilities.push("Straight");
-      if (currentBoardCombo === "High Card") {
-        currentBoardCombo = "Koneksi Straight";
-      }
-    }
-
-    if (possibilities.length === 0) possibilities.push("Top Pair", "Two Pair");
+    if (straightPossible) possibilities.push("Koneksi Straight");
+    if (possibilities.length === 0) possibilities.push(`Top Pair [${maxLabel}]`);
 
     const stageLabel = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
-    return `[${stageLabel}] Struktur Meja: <b>${currentBoardCombo}</b> | Potensi Terkuat Lawan: <b>${possibilities.join(' / ')}</b>`;
+    return `[${stageLabel}] Struktur Meja: <b>${boardStructureLabel}</b> | Potensi Terkuat Lawan: <b>${possibilities.join(' / ')}</b>`;
   }
 
-  getBettingAdvice(equity, myBestScore, commCount, draws, pot, oppBet) {
+  // KALKULASI STRATEGI & PROBABILITAS
+  getBettingAdvice(equity, myBestScore, commCount, draws) {
     let action = "CHECK / FOLD";
-    let reason = "Tangan masih lemah, mainkan dengan kontrol pot minimum.";
-    let betChips = "0 Chips";
-
-    const validHole = PokerEvaluator.getValidCards(this.holeCards);
-    const validComm = PokerEvaluator.getValidCards(this.communityCards);
+    let reason = "Tangan lemah. Disarankan Check gratis, atau Fold jika ada taruhan dari lawan.";
+    let betSizing = "0% Pot";
+    let maxCallPct = `${equity}% Pot`;
 
     if (commCount === 0) {
-      if (oppBet > 0) {
-        const reqOdds = Math.round((oppBet / (pot + oppBet * 2)) * 100);
-        if (equity >= reqOdds) {
-          action = "CALL (PRE-FLOP)";
-          reason = `✅ <b>CALL ACCEPTED:</b> Equity pre-flop (${equity}%) sepadan dengan risiko taruhan lawan (${reqOdds}% Risk).`;
-          betChips = `Call ${oppBet} Chips`;
-        } else {
-          action = "FOLD (PRE-FLOP)";
-          reason = `🚨 <b>OVERPAY PRE-FLOP:</b> Taruhan raise lawan ${oppBet} Chips terlalu besar dibandingkan kekuatan tangan Anda.`;
-          betChips = "Fold";
-        }
+      if (equity >= 75) {
+        action = "RAISE / RE-RAISE";
+        reason = "🔥 <b>MONSTER PRE-FLOP:</b> Ekuitas sangat tinggi (~80%+). Buka raise agresif 3x–5x Big Blind untuk membentuk pot besar.";
+        betSizing = "50% - 75% Pot";
+        maxCallPct = "100% Pot (All-In)";
+      } else if (equity >= 50) {
+        action = "RAISE / CALL";
+        reason = "♠️ <b>PRE-FLOP KUAT:</b> Kartu berpotensi tinggi. Lakukan Raise standar 2.5x BB atau Call jika lawan melakukan open raise kecil.";
+        betSizing = "33% - 50% Pot";
+        maxCallPct = "50% Pot";
       } else {
-        if (equity >= 75) {
-          action = "RAISE (3x - 5x)";
-          reason = "[PRE-FLOP] Memegang Monster Hand! Buka raise untuk isolasi lawan.";
-          betChips = `Bet ${Math.round(pot * 0.5)} Chips`;
-        } else if (equity >= 50) {
-          action = "RAISE / CALL";
-          reason = "[PRE-FLOP] Tangan standar tinggi. Buka taruhan standar 2.5x BB.";
-          betChips = `Bet ${Math.round(pot * 0.3)} Chips`;
-        } else {
-          action = "CHECK / FOLD";
-          reason = "[PRE-FLOP] Kartu berisiko. Lakukan Check jika gratis, atau Fold jika di-raise.";
-          betChips = "0 Chips (Check)";
-        }
+        action = "CHECK / FOLD";
+        reason = "⚠️ <b>PRE-FLOP RISIKAN:</b> Tangan lemah. Lakukan Check gratis di posisi Big Blind, atau Fold jika ada yang Raise.";
+        betSizing = "0% Pot";
+        maxCallPct = "15% Pot";
       }
-      return { action, reason, betChips };
-    }
-
-    const hasOverCards = validHole.some(hCard => {
-      const hVal = hCard.rank ? hCard.rank.value : hCard.value;
-      return validComm.every(cCard => {
-        const cVal = cCard.rank ? cCard.rank.value : cCard.value;
-        return hVal > cVal;
-      });
-    });
-
-    if (oppBet > 0) {
-      const totalPotAfterBet = pot + oppBet;
-      const requiredEquity = Math.round((oppBet / (totalPotAfterBet + oppBet)) * 100);
-      const stageName = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
-
-      if (commCount === 3 && draws.length > 0 && hasOverCards) {
-        action = "CALL / HERO CALL (BLUFF CATCH)";
-        reason = `⚡ <b>BLUFF CATCHER DETECTED [${stageName}]:</b> Lawan Raise/All-In ${oppBet} Chips. Memegang <b>Draw + Overcards (A/K)</b> memberi Anda total ekuitas riil sangat tinggi (~50%+) untuk merusak gertakan lawan!`;
-        betChips = `Call ${oppBet} Chips`;
-        return { action, reason, betChips };
-      }
-
-      if (draws.length === 0 && myBestScore <= 2) {
-        if (hasOverCards) {
-          action = "FOLD (MISSED FLOP)";
-          reason = `⚠️ <b>MISSED FLOP (A/K MELENYAP):</b> Peluang Anda hanya berharap keluar As/King di Turn/River (<b>~13% Outs</b>). Membayar ${oppBet} Chips mengejar 1 kartu adalah kerugian matematis (-EV). Disarankan <b>FOLD</b>!`;
-          betChips = "Fold";
-          return { action, reason, betChips };
-        } else if (myBestScore === 2) {
-          action = "FOLD (UNDERPAIR)";
-          reason = `🚨 <b>POCKET PAIR TERHIMPIT:</b> Ada kartu komunitas yang lebih tinggi dari Pocket Pair Anda. Peluang mengincar Set tinggal <b>~8% (2 Outs)</b>. Jangan bayar taruhan ${oppBet} Chips lawan!`;
-          betChips = "Fold";
-          return { action, reason, betChips };
-        }
-      }
-
-      if (equity >= requiredEquity) {
-        action = "CALL (WORTH IT)";
-        reason = `✅ <b>POT ODDS MASUK [${stageName}]:</b> Win Equity Anda (${equity}%) LEBIH BESAR dibanding Pot Odds yang diminta lawan (${requiredEquity}% Risk). Keputusan Call sangat menguntungkan (+EV).`;
-        betChips = `Call ${oppBet} Chips`;
-      } else {
-        action = "FOLD (OVERPAY)";
-        reason = `🚨 <b>TERLALU MAHAL [${stageName}]:</b> Lawan bet/raise ${oppBet} Chips (${requiredEquity}% Risk). Equity kartu Anda hanya ${equity}%. Mengejar kombinasi di sini rugi (-EV)!`;
-        betChips = `Fold (Kalah Odds)`;
-      }
-      return { action, reason, betChips };
+      return { action, reason, betSizing, maxCallPct };
     }
 
     if (myBestScore >= 7) {
-      action = "ALL-IN / VALUE BET";
-      reason = "Kombinasi Monster terbentuk! Lakukan Value Bet besar untuk memancing pot.";
-      betChips = `Bet ${Math.round(pot * 0.8)} - ALL IN`;
-    } else if (myBestScore >= 5 || equity >= 75) {
-      action = "VALUE BET (75% Pot)";
-      reason = "Kombinasi Anda sangat kuat. Lakukan Value Bet 3/4 Pot untuk memaksimalkan kemenangan.";
-      betChips = `Bet ${Math.round(pot * 0.75)} Chips`;
+      action = "SLOWPLAY / VALUE BET BESAR";
+      reason = "🏆 <b>NUT / MONSTER HAND:</b> Kombinasi Anda hampir tak tertandingi. Berikan Value Bet besar atau Check-Raise untuk menguras chip lawan.";
+      betSizing = "75% - 100% Pot";
+      maxCallPct = "100% Pot (All-In)";
+    } else if (myBestScore >= 5 || equity >= 70) {
+      action = "VALUE BET (75% POT)";
+      reason = "💎 <b>KOMBINASI SANGAT KUAT:</b> Kartu Anda menang atas mayoritas jangkauan lawan. Lakukan Value Bet untuk memancing pembayaran dari Pair lawan.";
+      betSizing = "66% - 75% Pot";
+      maxCallPct = "80% Pot";
     } else if (draws.length > 0) {
-      const stageLabel = commCount === 3 ? "FLOP" : "TURN";
-      action = "SEMI-BLUFF / CHECK";
-      reason = `🎯 <b>[${stageLabel}] ${draws[0].replace(/<\/?[^>]+(>|$)/g, "")}</b> Lakukan Bet 1/3 Pot untuk Semi-Bluff atau Check gratis untuk membuka kartu berikutnya.`;
-      betChips = `Bet ${Math.round(pot * 0.33)} Chips`;
+      const maxB = Math.round((equity / (100 - equity)) * 100);
+      action = "SEMI-BLUFF / CALL ODD";
+      reason = `🎯 <b>${draws[0].replace(/<\/?[^>]+(>|$)/g, "")}</b> Lakukan Semi-Bluff kecil. Batas maksimal Call taruhan lawan yang masih menguntungkan (+EV) adalah <b>${maxB}% dari total Pot</b>.`;
+      betSizing = "33% Pot";
+      maxCallPct = `${maxB}% Pot`;
     } else if (myBestScore >= 2 && equity >= 40) {
-      action = "BLOCK BET / CHECK";
-      reason = "Memegang Pair moderat. Lakukan taruhan kecil untuk mencegah lawan mengejar Draw murah.";
-      betChips = `Bet ${Math.round(pot * 0.25)} Chips`;
+      action = "BLOCK BET / CALL SMALL";
+      reason = "🛡️ <b>PAIR SEDANG / TOP PAIR:</b> Pegang kontrol pot dengan taruhan kecil (Block Bet) untuk mencegah lawan mengambil kartu gratis.";
+      betSizing = "25% - 33% Pot";
+      maxCallPct = "33% Pot";
+    } else {
+      action = "CHECK / FOLD";
+      reason = "🚨 <b>MISSED BOARD:</b> Tangan Anda tidak memiliki kombinasi atau Draw yang layak. Jangan bayar taruhan lawan yang melebihi 10% Pot.";
+      betSizing = "0% Pot";
+      maxCallPct = "10% Pot";
     }
 
-    return { action, reason, betChips };
+    return { action, reason, betSizing, maxCallPct };
   }
 
   render() {
@@ -488,7 +425,8 @@ class PokerApp {
       if (this.strengthBar) this.strengthBar.style.width = "0%";
       if (this.strengthPercent) this.strengthPercent.textContent = "0%";
       if (this.stratAction) this.stratAction.textContent = "WAIT";
-      if (this.stratAmount) this.stratAmount.textContent = "0 Chips";
+      if (this.stratAmount) this.stratAmount.textContent = "0% Pot";
+      if (this.maxCallProb) this.maxCallProb.textContent = "0% Pot";
       if (this.stratReason) this.stratReason.textContent = "Pilih 2 Kartu Tangan Terlebih Dahulu.";
       if (this.boardThreats) this.boardThreats.innerHTML = '';
       if (this.resultName) this.resultName.textContent = "-";
@@ -521,10 +459,11 @@ class PokerApp {
     }
 
     const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
-    const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws, this.currentPot, this.opponentBet);
+    const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws);
 
     if (this.stratAction) this.stratAction.textContent = advice.action;
-    if (this.stratAmount) this.stratAmount.textContent = advice.betChips;
+    if (this.stratAmount) this.stratAmount.textContent = advice.betSizing;
+    if (this.maxCallProb) this.maxCallProb.textContent = advice.maxCallPct;
     if (this.stratReason) this.stratReason.innerHTML = advice.reason;
 
     const threats = PokerEvaluator.analyzeBoardThreats(this.communityCards, this.holeCards);
