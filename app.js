@@ -13,6 +13,26 @@ class PokerApp {
     this.render();
   }
 
+  getCardRankLabel(card) {
+    if (!card) return '';
+    if (card.rank) {
+      return card.rank.label || card.rank.name || card.rank.value || card.rank;
+    }
+    return card.label || card.name || card.value || '';
+  }
+
+  getCardSuitInfo(card) {
+    if (!card) return { symbol: '', color: 'black' };
+    let symbol = '';
+    let color = 'black';
+
+    if (card.suit) {
+      symbol = card.suit.symbol || card.suit.name || card.suit;
+      color = card.suit.color || (symbol === '♥' || symbol === '♦' ? 'red' : 'black');
+    }
+    return { symbol, color };
+  }
+
   initDOM() {
     this.handCardsContainer = document.getElementById('hand-cards');
     this.communityCardsContainer = document.getElementById('community-cards');
@@ -68,23 +88,26 @@ class PokerApp {
       const row = document.createElement('div');
       row.className = 'suit-row';
 
+      const suitSym = suit.symbol || suit.name || suit;
+      const suitCol = suit.color || (suitSym === '♥' || suitSym === '♦' ? 'red' : 'black');
+
       const label = document.createElement('div');
-      label.className = `suit-label ${suit.color}`;
-      label.textContent = suit.symbol;
+      label.className = `suit-label ${suitCol}`;
+      label.textContent = suitSym;
       row.appendChild(label);
 
       const rankContainer = document.createElement('div');
       rankContainer.className = 'rank-buttons';
 
       RANKS.forEach(rank => {
+        const rankLbl = rank.label || rank.name || rank.value || rank;
         const btn = document.createElement('button');
-        btn.className = `btn-card-select ${suit.color}`;
-        btn.textContent = rank.label;
-        btn.dataset.suit = suit.symbol;
-        btn.dataset.rank = rank.label;
+        btn.className = `btn-card-select ${suitCol}`;
+        btn.textContent = rankLbl;
+        btn.dataset.suit = suitSym;
+        btn.dataset.rank = rankLbl;
 
         btn.addEventListener('click', () => {
-          // PERBAIKAN URUTAN PARAMETER: (rank, suit) SESUAI CONSTRUCTOR card.js
           this.selectCard(new Card(rank, suit));
         });
 
@@ -147,7 +170,11 @@ class PokerApp {
     buttons.forEach(btn => {
       const s = btn.dataset.suit;
       const r = btn.dataset.rank;
-      const isUsed = selectedCards.some(c => c && c.suit.symbol === s && c.rank.label === r);
+      const isUsed = selectedCards.some(c => {
+        const cRank = this.getCardRankLabel(c);
+        const cSuit = this.getCardSuitInfo(c).symbol;
+        return cSuit === s && cRank === r;
+      });
 
       if (isUsed) {
         btn.classList.add('disabled');
@@ -173,10 +200,13 @@ class PokerApp {
   renderCardSlot(element, card) {
     if (!element) return;
     if (card && card.rank && card.suit) {
-      element.className = `card filled ${card.suit.color}`;
+      const rankLabel = this.getCardRankLabel(card);
+      const suitInfo = this.getCardSuitInfo(card);
+
+      element.className = `card filled ${suitInfo.color}`;
       element.innerHTML = `
-        <span class="card-rank">${card.rank.label}</span>
-        <span class="card-suit">${card.suit.symbol}</span>
+        <span class="card-rank">${rankLabel}</span>
+        <span class="card-suit">${suitInfo.symbol}</span>
       `;
     } else {
       element.className = 'card placeholder';
@@ -244,6 +274,7 @@ class PokerApp {
     const validHole = PokerEvaluator.getValidCards(this.holeCards);
     const validComm = PokerEvaluator.getValidCards(this.communityCards);
 
+    // KARTU TANGAN INFO
     if (this.holeOnlyHand) {
       this.holeOnlyHand.textContent = PokerEvaluator.evaluateHoleCardsOnly(this.holeCards);
     }
@@ -266,7 +297,8 @@ class PokerApp {
     if (this.strengthPercent) this.strengthPercent.textContent = `${equity}%`;
 
     const myBest = PokerEvaluator.getBestHand([...validHole, ...validComm]);
-    
+    const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
+
     let comboText = myBest.rankName;
     if (validComm.length === 0 && comboText.includes('- Kicker []')) {
       comboText = comboText.replace(' - Kicker []', '');
@@ -275,7 +307,7 @@ class PokerApp {
     if (this.myBestHand) this.myBestHand.textContent = comboText;
     if (this.resultName) this.resultName.textContent = comboText;
 
-    // FITUR BADGE KOMBINASI HIJAU BARU
+    // BADGE HIJAU DINAMIS UNTUK FLOP (3 KARTU) SAMPAI RIVER
     let comboBadgeContainer = document.getElementById('combo-green-badge-element');
     if (!comboBadgeContainer && this.communityCardsContainer) {
       comboBadgeContainer = document.createElement('div');
@@ -284,15 +316,26 @@ class PokerApp {
     }
 
     if (comboBadgeContainer) {
-      if (myBest && myBest.score >= 2) {
-        const locationText = validComm.length === 0 
-          ? "Pre-Flop (Di Tangan)" 
-          : (myBest.score >= 5 ? "Tangan + Meja (Terbentuk)" : "Di Komunitas / Tangan");
-        
+      if (myBest && myBest.score >= 5) { // Kombinasi Sudah Jadi (Straight / Flush / Full House)
         comboBadgeContainer.innerHTML = `
           <div class="combo-green-badge">
             <span class="badge-icon">⚡</span>
-            <span>Kombinasi Aktif: <b>${comboText.split('(')[0]}</b> [${locationText}]</span>
+            <span>Kombinasi Aktif: <b>${comboText.split('(')[0]}</b> [Tangan + Meja (Terbentuk)]</span>
+          </div>
+        `;
+      } else if (draws.length > 0) { // Flop 3 Kartu Ada Draw (Flush / Straight Draw)
+        const drawText = draws[0].replace(/<\/?[^>]+(>|$)/g, "");
+        comboBadgeContainer.innerHTML = `
+          <div class="combo-green-badge" style="background: rgba(0, 240, 255, 0.15); border-color: rgba(0, 240, 255, 0.5); color: #00f0ff;">
+            <span class="badge-icon">🎯</span>
+            <span>Potensi Proyeksi Aktif: <b>${drawText}</b></span>
+          </div>
+        `;
+      } else if (myBest && myBest.score >= 2) { // Pair / Two Pair
+        comboBadgeContainer.innerHTML = `
+          <div class="combo-green-badge">
+            <span class="badge-icon">⚡</span>
+            <span>Kombinasi Aktif: <b>${comboText.split('(')[0]}</b></span>
           </div>
         `;
       } else {
@@ -300,7 +343,6 @@ class PokerApp {
       }
     }
 
-    const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
     const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws);
 
     if (this.stratAction) this.stratAction.textContent = advice.action;
