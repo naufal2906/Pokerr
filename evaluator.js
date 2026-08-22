@@ -86,7 +86,7 @@ export class PokerEvaluator {
     return [...new Set(draws)];
   }
 
-  // 3. ANALISIS ANCAMAN MEJA & MATRIKS KEMUNGKINAN LENGKAP
+  // 3. ANALISIS ANCAMAN MEJA & PERLUASAN ANCAMAN OVERCARD/TOP PAIR
   static analyzeBoardThreats(communityCards, holeCards = []) {
     const comm = this.getValidCards(communityCards);
     if (comm.length < 3) {
@@ -104,10 +104,10 @@ export class PokerEvaluator {
     const totalCards = [...validHand, ...comm];
     const myBest = this.getBestHand(totalCards);
     const myScore = myBest ? myBest.score : 0; 
-    const boardOnlyBest = this.getBestHand(comm);
 
     const commRanks = comm.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
-    const uniqueCommRanks = [...new Set(commRanks)].sort((a, b) => a - b);
+    const maxRank = commRanks[0];
+    const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
 
     // Kembang Komunitas
     const suitCounts = {};
@@ -125,131 +125,33 @@ export class PokerEvaluator {
     const boardHasPair = Object.values(rankCounts).some(count => count >= 2);
     const boardHasTrips = Object.values(rankCounts).some(count => count >= 3);
 
-    // Straight Potential Komunitas
-    let boardHasStraight = false;
-    let straightNeeds = [];
-    const checkRanks = [...uniqueCommRanks];
-    if (checkRanks.includes(14)) checkRanks.unshift(1);
-
-    for (let target = 2; target <= 14; target++) {
-      const windowCards = checkRanks.filter(r => r >= target - 4 && r <= target);
-      if (windowCards.length >= 3) {
-        const minW = Math.min(...windowCards);
-        const maxW = Math.max(...windowCards);
-        if (maxW - minW <= 4) {
-          boardHasStraight = true;
-          for (let fill = target - 4; fill <= target; fill++) {
-            if (fill >= 1 && !checkRanks.includes(fill)) {
-              const label = fill === 1 || fill === 14 ? 'A' : fill === 13 ? 'K' : fill === 12 ? 'Q' : fill === 11 ? 'J' : fill;
-              straightNeeds.push(label);
-            }
-          }
-        }
-      }
-    }
-    straightNeeds = [...new Set(straightNeeds)];
-
-    // SKOR MAKSIMAL MEJA
-    let maxBoardScore = 1;
+    // ANALISIS ANCAMAN MULTI-LAYER & OVERCARDS
     let highestBoardComboName = "";
     let worstCaseMessage = "";
 
     if (boardHasTrips || boardHasPair) {
-      maxBoardScore = boardHasTrips ? 8 : 7;
-      highestBoardComboName = boardHasTrips ? "Four of a Kind (Quads)" : "Full House / Trips";
-      const tripOrPairRanks = Object.keys(rankCounts).filter(r => rankCounts[r] >= 2).map(r => r == 14 ? 'A' : r == 13 ? 'K' : r == 12 ? 'Q' : r == 11 ? 'J' : r);
-      
-      if (boardHasTrips) {
-        worstCaseMessage = `🚨 <b>POTENSI QUADS / FULL HOUSE:</b> Di meja ada Trips [${tripOrPairRanks.join(', ')}]. Waspada Four of a Kind atau Full House lawan.`;
-      } else {
-        worstCaseMessage = `🏠 <b>MEJA BERPASANGAN [${tripOrPairRanks.join(', ')}]:</b> Meja berpasangan berpotensi membawa Full House untuk lawan yang punya Set/Pair.`;
-      }
+      highestBoardComboName = boardHasTrips ? "Four of a Kind / Full House" : "Full House / Trips";
+      worstCaseMessage = `🏠 <b>MEJA BERPASANGAN:</b> Lawan yang memegang Set/Pair memiliki potensi Full House.`;
     } else if (boardHasFlush) {
-      maxBoardScore = 6;
       highestBoardComboName = `Flush (Kembang ${flushSuit})`;
-      worstCaseMessage = `🌊 <b>POTENSI FLUSH:</b> Meja ada 3+ kembang ${flushSuit}! Lawan dengan kembang ${flushSuit} bisa membentuk Flush.`;
-    } else if (boardHasStraight) {
-      maxBoardScore = 5;
-      highestBoardComboName = "Straight (Urutan 5 Kartu)";
-      const needsTxt = straightNeeds.length > 0 ? straightNeeds.join(' atau ') : 'Pelengkap';
-      worstCaseMessage = `🎯 <b>POTENSI STRAIGHT:</b> Meja berurutan! Lawan membawa [${needsTxt}] jadi Straight.`;
+      worstCaseMessage = `🌊 <b>POTENSI FLUSH:</b> Meja memiliki 3+ kembang ${flushSuit}. Lawan dengan 2 kembang ${flushSuit} memegang Flush.`;
     } else {
-      maxBoardScore = 2;
-      const maxRank = Math.max(...commRanks);
-      const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
-      highestBoardComboName = `Top Pair (${maxLabel})`;
-      worstCaseMessage = `⚠️ <b>PAPAN KERING:</b> Lawan yang membawa kartu [${maxLabel}] membentuk Top Pair.`;
+      highestBoardComboName = `Top Pair / Two Pair [Top Card ${maxLabel}]`;
+      worstCaseMessage = `👑 <b>ANCAMAN TOP PAIR / OVERCARD:</b> Lawan yang memegang kartu [${maxLabel}] membentuk <b>Top Pair (${maxLabel})</b> dengan Kicker tinggi.`;
     }
 
-    // CHECK NUT FLUSH
-    let isNutFlush = false;
-    let isSecondNutFlush = false;
-
-    if (myScore === 6 && validHand.length > 0) {
-      const flushHoleCards = validHand.filter(c => this.getCardSuitSymbol(c) === flushSuit);
-      const hasAceFlush = flushHoleCards.some(c => (c.rank ? c.rank.value : c.value) === 14);
-      const boardHasAceFlush = comm.some(c => this.getCardSuitSymbol(c) === flushSuit && (c.rank ? c.rank.value : c.value) === 14);
-
-      if (hasAceFlush || boardHasAceFlush) {
-        isNutFlush = !boardHasPair && !boardHasTrips; 
-        if (boardHasPair || boardHasTrips) isSecondNutFlush = true;
-      } else {
-        isSecondNutFlush = true;
-      }
-    }
-
-    // CHECK NUT STRAIGHT
-    let isNutStraight = false;
-    let isSecondNutStraight = false;
-
-    if (myScore === 5 && myBest && myBest.cards.length > 0) {
-      const myStraightHigh = myBest.cards[0].rank ? myBest.cards[0].rank.value : myBest.cards[0].value;
-      const commMax = Math.max(...commRanks);
-      const possibleMaxStraightHigh = Math.min(14, commMax + 2);
-
-      if ((myStraightHigh >= possibleMaxStraightHigh || myStraightHigh === 14) && !boardHasPair && !boardHasTrips && !boardHasFlush) {
-        isNutStraight = true;
-      } else {
-        isSecondNutStraight = true;
-      }
-    }
-
-    const isOverpair = validHand.length === 2 && 
-                       validHand[0].rank.value === validHand[1].rank.value && 
-                       validHand[0].rank.value > Math.max(...commRanks);
-
-    const isBoardPlay = myScore === boardOnlyBest.score && myScore >= 5;
-
-    if ((isNutFlush || isNutStraight || myScore > maxBoardScore || (myScore === 2 && isOverpair && maxBoardScore <= 2)) && !isBoardPlay) {
+    if (myScore >= 5) {
       threats.push({
         text: `KARTU TANGAN DI ATAS POTENSI MEJA (^)`,
-        boardPotential: `Potensi Meja: ${highestBoardComboName} | Milik Anda: ${myBest.rankName}`,
-        worstCase: `✅ KARTU AMAN & UNGGUL! Anda memegang Nut / Kombinasi Tertinggi Mutlak (${myBest.rankName}) di meja saat ini.`,
+        boardPotential: `Potensi Meja: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
+        worstCase: `✅ <b>DOMINAN:</b> Kombinasi Anda (${myBest.rankName}) menang di atas potensi meja saat ini.`,
         indicator: "^",
         safe: true
       });
-    } else if (myScore === maxBoardScore || isSecondNutFlush || isSecondNutStraight || isBoardPlay) {
-      let warnMsg = `⚠️ KARTU SETARA (=)! Kombinasi Anda setara dengan potensi meja, adu Kicker jika lawan punya kartu sama.`;
-
-      if (isBoardPlay) {
-        warnMsg = `🤝 <b>SPLIT POT POTENTIAL (=):</b> Kombinasi terbaik [${myBest.rankName}] sudah terbentuk murni di meja. Semua pemain membagi pot kecuali lawan punya kombinasi lebih tinggi!`;
-      } else if (isSecondNutFlush) {
-        warnMsg = `⚠️ WASPADA FLUSH/FULL HOUSE (=)! Kartu Anda Flush (${myBest.rankName}), waspada lawan pegang As Flush (${flushSuit}) atau Full House dari meja berpasangan.`;
-      } else if (isSecondNutStraight) {
-        warnMsg = `⚠️ WASPADA STRAIGHT LEBIH TINGGI / FLUSH (=)! Kartu Anda Straight (${myBest.rankName}), waspada urutan lebih tinggi atau potensi Flush lawan.`;
-      }
-
-      threats.push({
-        text: `KOMBINASI SETARA DENGAN POTENSI MEJA (=)`,
-        boardPotential: `Potensi Meja: ${highestBoardComboName} | Milik Anda: ${myBest.rankName}`,
-        worstCase: warnMsg,
-        indicator: "=",
-        safe: true
-      });
     } else {
       threats.push({
-        text: `POTENSI MEJA DI ATAS KARTU TANGAN (v)`,
-        boardPotential: `Potensi Meja: ${highestBoardComboName} | Milik Anda: ${myBest.rankName}`,
+        text: `POTENSI MEJA & OVERCARD LAWAN (v)`,
+        boardPotential: `Potensi Meja: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
         worstCase: worstCaseMessage,
         indicator: "v",
         safe: false
@@ -283,7 +185,7 @@ export class PokerEvaluator {
     return Math.round(equity);
   }
 
-  // 5. EVALUASI LENGKAP 5 KARTU TERBAIK (PERBAIKAN HIRARKI POKER SEJATI)
+  // 5. EVALUASI LENGKAP 5 KARTU TERBAIK
   static getBestHand(cards) {
     const valid = this.getValidCards(cards);
     if (valid.length === 0) return { score: 0, rankName: "-", cards: [] };
@@ -296,7 +198,6 @@ export class PokerEvaluator {
 
     const values = [...new Set(sorted.map(c => c.rank ? c.rank.value : c.value))].sort((a, b) => b - a);
 
-    // KELOMPOKKAN KARTU BERDASARKAN KEMBANG (SUIT)
     const suitGroups = {};
     sorted.forEach(c => {
       const s = PokerEvaluator.getCardSuitSymbol(c);
@@ -309,7 +210,7 @@ export class PokerEvaluator {
       if (suitGroups[s].length >= 5) flushCards = suitGroups[s];
     });
 
-    // 1. CEK STRAIGHT FLUSH & ROYAL FLUSH
+    // 1. STRAIGHT FLUSH & ROYAL FLUSH
     if (flushCards) {
       const fValues = [...new Set(flushCards.map(c => c.rank ? c.rank.value : c.value))].sort((a, b) => b - a);
       if (fValues.includes(14)) fValues.push(1);
@@ -335,7 +236,7 @@ export class PokerEvaluator {
     const tripKeys = Object.keys(counts).filter(k => counts[k].length === 3).map(Number).sort((a, b) => b - a);
     const pairKeys = Object.keys(counts).filter(k => counts[k].length === 2).map(Number).sort((a, b) => b - a);
 
-    // 2. FOUR OF A KIND (QUADS)
+    // 2. FOUR OF A KIND
     if (quadKeys.length > 0) {
       const quadCards = counts[quadKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       return { score: 8, rankName: `Four of a Kind (${quadCards})`, cards: sorted.slice(0, 5) };
@@ -349,7 +250,7 @@ export class PokerEvaluator {
       return { score: 7, rankName: `Full House (${tripCards} ${pairCards})`, cards: sorted.slice(0, 5) };
     }
 
-    // 4. FLUSH BIASA (EVALUASI DAHULU DIBANDING STRAIGHT SESUAI HIRARKI POKER SEJATI!)
+    // 4. FLUSH BIASA (HIRARKI TERATAS SEBELUM STRAIGHT)
     if (flushCards) {
       const topFlushCard = PokerEvaluator.formatCardText(flushCards[0]);
       return { score: 6, rankName: `Flush (${topFlushCard}-High)`, cards: flushCards.slice(0, 5) };
@@ -375,7 +276,7 @@ export class PokerEvaluator {
       }
     }
 
-    // 6. THREE OF A KIND (TRIPS)
+    // 6. THREE OF A KIND
     if (tripKeys.length === 1) {
       const tripCards = counts[tripKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       return { score: 4, rankName: `Three of a Kind (${tripCards})`, cards: sorted.slice(0, 5) };
@@ -402,8 +303,8 @@ export class PokerEvaluator {
       };
     }
 
-    // 9. HIGH CARD
+    // 9. HIGH CARD DENGAN KETERANGAN
     const topCard = this.formatCardText(sorted[0]);
-    return { score: 1, rankName: `High Card (${topCard})`, cards: sorted.slice(0, 5) };
+    return { score: 1, rankName: `High Card (${topCard}) - Butuh Pair/Draw`, cards: sorted.slice(0, 5) };
   }
 }
