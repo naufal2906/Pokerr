@@ -214,7 +214,7 @@ class PokerApp {
     }
   }
 
-  // REVISI 1: LOGIKA PROYEKSI DINAMIS KARTU TANGAN (MENYUSUT BERDASARKAN BOARD)
+  // PROYEKSI KARTU TANGAN (MENYUSUT BERDASARKAN KARTU MEJA)
   getDynamicHoleProjections(holeCards, communityCards) {
     const validHole = PokerEvaluator.getValidCards(holeCards);
     const validComm = PokerEvaluator.getValidCards(communityCards);
@@ -224,7 +224,6 @@ class PokerApp {
     const myBest = PokerEvaluator.getBestHand(allCards);
     const commCount = validComm.length;
 
-    // A. PRE-FLOP (0 Kartu Komunitas) - Tampilkan Seluruh Potensi
     if (commCount === 0) {
       const v1 = validHole[0].rank ? validHole[0].rank.value : validHole[0].value;
       const v2 = validHole[1].rank ? validHole[1].rank.value : validHole[1].value;
@@ -242,15 +241,11 @@ class PokerApp {
       }
     }
 
-    // B. RIVER (5 Kartu Komunitas) - Kunci Hanya ke Kombinasi Akhir
     if (commCount === 5) {
       return [`🏆 Kombinasi Final: ${myBest.rankName.split('(')[0].trim()}`];
     }
 
-    // C. FLOP (3 Kartu) & TURN (4 Kartu) - Filter Menyusut Sesuai Kartu yang Muncul
     const proj = [];
-
-    // Cek Potensi Flush / Flush Draw
     const suitCounts = {};
     allCards.forEach(c => {
       const s = this.getCardSuitInfo(c).symbol;
@@ -264,7 +259,6 @@ class PokerApp {
       proj.push("🌊 Flush Draw (Butuh 1 Kembang)");
     }
 
-    // Cek Potensi Straight / Straight Draw
     const draws = PokerEvaluator.detectDraws(holeCards, communityCards);
     const hasStraightDraw = draws.some(d => d.includes("Straight Draw"));
 
@@ -274,7 +268,6 @@ class PokerApp {
       proj.push("🎯 Straight Draw");
     }
 
-    // Cek Made Hands (Full House, Quads, Trips, Two Pair, One Pair)
     if (myBest.score >= 7) {
       proj.push(`✅ ${myBest.rankName.split('(')[0].trim()}`);
     } else if (myBest.score === 4) {
@@ -290,10 +283,11 @@ class PokerApp {
     return [...new Set(proj)];
   }
 
-  // REVISI 2: LOGIKA ANALISIS MURNI MEJA (BOARD ONLY Threat Detector)
+  // REVISI 2: MURNI MEJA DENGAN PENYUSUTAN DINAMIS (BOARD ONLY THREATS)
   getBoardOnlyAnalysis(communityCards) {
     const validComm = PokerEvaluator.getValidCards(communityCards);
-    if (validComm.length < 3) return "";
+    const commCount = validComm.length;
+    if (commCount < 3) return "";
 
     const commRanks = validComm.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
     const commSuits = {};
@@ -308,47 +302,69 @@ class PokerApp {
 
     const hasPair = Object.values(rankCounts).some(cnt => cnt >= 2);
     const hasTrips = Object.values(rankCounts).some(cnt => cnt >= 3);
-
-    const possibilities = [];
-
-    // Deteksi Potensi Full House / Quads / Trips
-    if (hasTrips) {
-      possibilities.push("Four of a Kind (Quads)", "Full House");
-    } else if (hasPair) {
-      possibilities.push("Full House", "Three of a Kind (Trips)", "Two Pair");
-    }
-
-    // Deteksi Potensi Flush
-    if (maxSuitCount >= 5) {
-      possibilities.push("Flush (Sudah Jadi di Meja)");
-    } else if (maxSuitCount >= 3) {
-      possibilities.push(`Flush (${maxSuitCount}/5 Kembang Sama)`);
-    }
-
-    // Deteksi Potensi Straight
-    const uniqueRanks = [...new Set(commRanks)].sort((a, b) => a - b);
-    if (uniqueRanks.includes(14)) uniqueRanks.unshift(1);
-    
-    let straightPossible = false;
-    for (let target = 2; target <= 14; target++) {
-      const windowCards = uniqueRanks.filter(r => r >= target - 4 && r <= target);
-      if (windowCards.length >= 3) {
-        straightPossible = true;
-        break;
-      }
-    }
-    if (straightPossible) {
-      possibilities.push("Straight");
-    }
-
-    if (possibilities.length === 0) {
-      possibilities.push("Top Pair", "High Card");
-    }
+    const hasQuads = Object.values(rankCounts).some(cnt => cnt >= 4);
 
     const boardBest = PokerEvaluator.getBestHand(validComm);
     const currentBoardCombo = boardBest.rankName.split('(')[0].trim();
 
-    return `Struktur Meja: <b>${currentBoardCombo}</b> | Potensi Maksimal Lawan: <b>${possibilities.join(' / ')}</b>`;
+    const possibilities = [];
+
+    // 1. CEK POTENSI FULL HOUSE / QUADS / TRIPS
+    if (hasQuads) {
+      possibilities.push("Four of a Kind (Terbuka di Meja)");
+    } else if (hasTrips) {
+      possibilities.push("Four of a Kind (Quads)", "Full House");
+    } else if (hasPair) {
+      possibilities.push("Full House", "Three of a Kind (Trips)");
+      if (commCount < 5) possibilities.push("Two Pair");
+    }
+
+    // 2. CEK POTENSI FLUSH (MENYUSUT JIKA DI TURN/RIVER TIDAK ADA 3+ KEMBANG SAMA)
+    if (maxSuitCount >= 5) {
+      possibilities.push("Flush (Terbentuk Murni di Meja)");
+    } else if (maxSuitCount === 4) {
+      possibilities.push("Flush (Lawan Memegang 1 Kembang)");
+    } else if (maxSuitCount === 3) {
+      if (commCount < 5) {
+        possibilities.push("Flush Draw (Lawan Memegang 2 Kembang)");
+      } else {
+        possibilities.push("Flush (Lawan Memegang 2 Kembang)");
+      }
+    }
+
+    // 3. CEK POTENSI STRAIGHT (MENYUSUT SIKAT RESPONSIF BERDASARKAN URUTAN)
+    const uniqueRanks = [...new Set(commRanks)].sort((a, b) => a - b);
+    if (uniqueRanks.includes(14)) uniqueRanks.unshift(1);
+
+    let straightPossible = false;
+    for (let target = 2; target <= 14; target++) {
+      const windowCards = uniqueRanks.filter(r => r >= target - 4 && r <= target);
+      if (commCount === 5 && windowCards.length >= 3) {
+        // Pada River, pastikan urutan benar-benar bisa disambungkan oleh 2 kartu tangan
+        const minW = Math.min(...windowCards);
+        const maxW = Math.max(...windowCards);
+        if (maxW - minW <= 4) {
+          straightPossible = true;
+          break;
+        }
+      } else if (windowCards.length >= 3) {
+        straightPossible = true;
+        break;
+      }
+    }
+    
+    if (straightPossible) {
+      possibilities.push("Straight");
+    }
+
+    // Default jika papan sangat kering
+    if (possibilities.length === 0) {
+      possibilities.push("Top Pair", "Two Pair");
+    }
+
+    const stageLabel = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
+
+    return `[${stageLabel}] Struktur Meja: <b>${currentBoardCombo}</b> | Potensi Terkuat Lawan: <b>${possibilities.join(' / ')}</b>`;
   }
 
   getBettingAdvice(equity, myBestScore, commCount, draws) {
@@ -415,7 +431,7 @@ class PokerApp {
       this.holeOnlyHand.textContent = PokerEvaluator.evaluateHoleCardsOnly(this.holeCards);
     }
 
-    // TAMPILAN REVISI 1: PROYEKSI KARTU TANGAN DINAMIS
+    // PROYEKSI KARTU TANGAN DINAMIS
     let holeProjectionContainer = document.getElementById('hole-projection-badge-element');
     if (!holeProjectionContainer && this.handCardsContainer) {
       holeProjectionContainer = document.createElement('div');
@@ -461,7 +477,7 @@ class PokerApp {
     if (this.myBestHand) this.myBestHand.textContent = comboText;
     if (this.resultName) this.resultName.textContent = comboText;
 
-    // TAMPILAN REVISI 2: INDIKATOR MEJA MURNI (BOARD ONLY THREATS)
+    // INDIKATOR MURNI MEJA DENGAN PENYUSUTAN DINAMIS (FLOP -> TURN -> RIVER)
     let comboBadgeContainer = document.getElementById('combo-green-badge-element');
     if (!comboBadgeContainer && this.communityCardsContainer) {
       comboBadgeContainer = document.createElement('div');
