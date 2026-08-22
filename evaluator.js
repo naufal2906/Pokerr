@@ -191,7 +191,6 @@ export class PokerEvaluator {
       const boardHasAceFlush = comm.some(c => this.getCardSuitSymbol(c) === flushSuit && (c.rank ? c.rank.value : c.value) === 14);
 
       if (hasAceFlush || boardHasAceFlush) {
-        // Jika Nut Flush tapi Meja Berpasangan, tetap waspada Full House!
         isNutFlush = !boardHasPair && !boardHasTrips; 
         if (boardHasPair || boardHasTrips) isSecondNutFlush = true;
       } else {
@@ -215,15 +214,12 @@ export class PokerEvaluator {
       }
     }
 
-    // CHECK OVERPAIR
     const isOverpair = validHand.length === 2 && 
                        validHand[0].rank.value === validHand[1].rank.value && 
                        validHand[0].rank.value > Math.max(...commRanks);
 
-    // CHECK BOARD PLAY (SPLIT POT)
     const isBoardPlay = myScore === boardOnlyBest.score && myScore >= 5;
 
-    // PENENTUAN INDIKATOR KOMPARASI HIERARKI (^ / = / v)
     if ((isNutFlush || isNutStraight || myScore > maxBoardScore || (myScore === 2 && isOverpair && maxBoardScore <= 2)) && !isBoardPlay) {
       threats.push({
         text: `KARTU TANGAN DI ATAS POTENSI MEJA (^)`,
@@ -287,7 +283,7 @@ export class PokerEvaluator {
     return Math.round(equity);
   }
 
-  // 5. EVALUASI LENGKAP 5 KARTU TERBAIK
+  // 5. EVALUASI LENGKAP 5 KARTU TERBAIK (PERBAIKAN HIRARKI POKER SEJATI)
   static getBestHand(cards) {
     const valid = this.getValidCards(cards);
     if (valid.length === 0) return { score: 0, rankName: "-", cards: [] };
@@ -300,7 +296,7 @@ export class PokerEvaluator {
 
     const values = [...new Set(sorted.map(c => c.rank ? c.rank.value : c.value))].sort((a, b) => b - a);
 
-    // Straight Flush & Royal Flush
+    // KELOMPOKKAN KARTU BERDASARKAN KEMBANG (SUIT)
     const suitGroups = {};
     sorted.forEach(c => {
       const s = PokerEvaluator.getCardSuitSymbol(c);
@@ -313,6 +309,7 @@ export class PokerEvaluator {
       if (suitGroups[s].length >= 5) flushCards = suitGroups[s];
     });
 
+    // 1. CEK STRAIGHT FLUSH & ROYAL FLUSH
     if (flushCards) {
       const fValues = [...new Set(flushCards.map(c => c.rank ? c.rank.value : c.value))].sort((a, b) => b - a);
       if (fValues.includes(14)) fValues.push(1);
@@ -327,7 +324,38 @@ export class PokerEvaluator {
       }
     }
 
-    // Straight Biasa
+    const counts = {};
+    sorted.forEach(c => {
+      const v = c.rank ? c.rank.value : c.value;
+      counts[v] = counts[v] || [];
+      counts[v].push(c);
+    });
+
+    const quadKeys = Object.keys(counts).filter(k => counts[k].length === 4).map(Number).sort((a, b) => b - a);
+    const tripKeys = Object.keys(counts).filter(k => counts[k].length === 3).map(Number).sort((a, b) => b - a);
+    const pairKeys = Object.keys(counts).filter(k => counts[k].length === 2).map(Number).sort((a, b) => b - a);
+
+    // 2. FOUR OF A KIND (QUADS)
+    if (quadKeys.length > 0) {
+      const quadCards = counts[quadKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      return { score: 8, rankName: `Four of a Kind (${quadCards})`, cards: sorted.slice(0, 5) };
+    }
+
+    // 3. FULL HOUSE
+    if (tripKeys.length > 0 && (pairKeys.length > 0 || tripKeys.length > 1)) {
+      const tripCards = counts[tripKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      const pVal = tripKeys.length > 1 ? tripKeys[1] : pairKeys[0];
+      const pairCards = counts[pVal].slice(0, 2).map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      return { score: 7, rankName: `Full House (${tripCards} ${pairCards})`, cards: sorted.slice(0, 5) };
+    }
+
+    // 4. FLUSH BIASA (EVALUASI DAHULU DIBANDING STRAIGHT SESUAI HIRARKI POKER SEJATI!)
+    if (flushCards) {
+      const topFlushCard = PokerEvaluator.formatCardText(flushCards[0]);
+      return { score: 6, rankName: `Flush (${topFlushCard}-High)`, cards: flushCards.slice(0, 5) };
+    }
+
+    // 5. STRAIGHT BIASA
     const straightVals = [...values];
     if (straightVals.includes(14)) straightVals.push(1);
 
@@ -347,50 +375,20 @@ export class PokerEvaluator {
       }
     }
 
-    // Flush Biasa
-    if (flushCards) {
-      return { score: 6, rankName: `Flush`, cards: flushCards.slice(0, 5) };
-    }
-
-    const counts = {};
-    sorted.forEach(c => {
-      const v = c.rank ? c.rank.value : c.value;
-      counts[v] = counts[v] || [];
-      counts[v].push(c);
-    });
-
-    const quadKeys = Object.keys(counts).filter(k => counts[k].length === 4).map(Number).sort((a, b) => b - a);
-    const tripKeys = Object.keys(counts).filter(k => counts[k].length === 3).map(Number).sort((a, b) => b - a);
-    const pairKeys = Object.keys(counts).filter(k => counts[k].length === 2).map(Number).sort((a, b) => b - a);
-
-    // Four of a Kind
-    if (quadKeys.length > 0) {
-      const quadCards = counts[quadKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      return { score: 8, rankName: `Four of a Kind (${quadCards})`, cards: sorted.slice(0, 5) };
-    }
-
-    // Full House
-    if (tripKeys.length > 0 && (pairKeys.length > 0 || tripKeys.length > 1)) {
-      const tripCards = counts[tripKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      const pVal = tripKeys.length > 1 ? tripKeys[1] : pairKeys[0];
-      const pairCards = counts[pVal].slice(0, 2).map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      return { score: 7, rankName: `Full House (${tripCards} ${pairCards})`, cards: sorted.slice(0, 5) };
-    }
-
-    // Three of a Kind
+    // 6. THREE OF A KIND (TRIPS)
     if (tripKeys.length === 1) {
       const tripCards = counts[tripKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       return { score: 4, rankName: `Three of a Kind (${tripCards})`, cards: sorted.slice(0, 5) };
     }
 
-    // Two Pair
+    // 7. TWO PAIR
     if (pairKeys.length >= 2) {
       const p1 = counts[pairKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       const p2 = counts[pairKeys[1]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       return { score: 3, rankName: `Two Pair (${p1} & ${p2})`, cards: sorted.slice(0, 5) };
     }
 
-    // One Pair
+    // 8. ONE PAIR
     if (pairKeys.length === 1) {
       const pairVal = pairKeys[0];
       const pairCards = counts[pairVal].map(c => PokerEvaluator.formatCardText(c)).join(' ');
@@ -404,7 +402,7 @@ export class PokerEvaluator {
       };
     }
 
-    // High Card
+    // 9. HIGH CARD
     const topCard = this.formatCardText(sorted[0]);
     return { score: 1, rankName: `High Card (${topCard})`, cards: sorted.slice(0, 5) };
   }
