@@ -6,7 +6,8 @@ class PokerApp {
     this.holeCards = [null, null];
     this.communityCards = [null, null, null, null, null];
     this.activeSlot = null; // { type: 'hole'|'community', index: number }
-    this.currentPot = 1000; // Default awal pot
+    this.currentPot = 1000;  // Default awal pot
+    this.opponentBet = 0;    // Default awal bet/raise lawan
 
     this.initDOM();
     this.renderInitialSlots();
@@ -44,7 +45,10 @@ class PokerApp {
     this.stratAction = document.getElementById('strat-action');
     this.stratAmount = document.getElementById('strat-amount');
     this.stratReason = document.getElementById('strat-reason');
-    this.potInput = document.getElementById('pot-size-input'); // Input Pot Baru
+    
+    // INPUT DOM POT ODDS
+    this.potInput = document.getElementById('pot-size-input');
+    this.opponentBetInput = document.getElementById('opponent-bet-input');
 
     this.boardThreats = document.getElementById('board-threats');
     this.resultName = document.getElementById('result-name');
@@ -112,9 +116,9 @@ class PokerApp {
 
   bindEvents() {
     document.addEventListener('click', (e) => {
-      // FITUR HAPUS SATUAN: Jika klik ikon (×) pada kartu yang terisi
+      // FITUR HAPUS SATUAN (×)
       if (e.target.classList.contains('remove-card-btn')) {
-        e.stopPropagation(); // Cegah modal terbuka
+        e.stopPropagation();
         const cardSlot = e.target.closest('.card');
         const type = cardSlot.dataset.type;
         const index = parseInt(cardSlot.dataset.index, 10);
@@ -126,7 +130,6 @@ class PokerApp {
         return;
       }
 
-      // Buka Modal jika klik area kartu (selain tombol hapus)
       const cardSlot = e.target.closest('.card');
       if (cardSlot && cardSlot.dataset.type) {
         const type = cardSlot.dataset.type;
@@ -138,6 +141,13 @@ class PokerApp {
     if (this.potInput) {
       this.potInput.addEventListener('input', (e) => {
         this.currentPot = parseInt(e.target.value) || 0;
+        this.render();
+      });
+    }
+
+    if (this.opponentBetInput) {
+      this.opponentBetInput.addEventListener('input', (e) => {
+        this.opponentBet = parseInt(e.target.value) || 0;
         this.render();
       });
     }
@@ -335,44 +345,79 @@ class PokerApp {
     return `[${stageLabel}] Struktur Meja: <b>${currentBoardCombo}</b> | Potensi Terkuat Lawan: <b>${possibilities.join(' / ')}</b>`;
   }
 
-  // LOGIKA BET DINAMIS BERDASARKAN TOTAL POT INPUT
-  getBettingAdvice(equity, myBestScore, commCount, draws, pot) {
+  // LOGIKA MATEMATIKA POT ODDS VS EQUITY DINAMIS
+  getBettingAdvice(equity, myBestScore, commCount, draws, pot, oppBet) {
     let action = "CHECK / FOLD";
-    let reason = "Tangan sangat lemah. Disarankan Check, atau Fold jika ada taruhan lawan.";
+    let reason = "Tangan masih lemah, mainkan dengan kontrol pot minimum.";
     let betChips = "0 Chips";
 
+    // 1. PRE-FLOP
     if (commCount === 0) {
-      if (equity >= 75) {
-        action = "RAISE (3x - 5x)";
-        reason = "[PRE-FLOP] Monster Hand! Naikkan taruhan 3x hingga 5x Big Blind untuk isolasi lawan.";
-        betChips = `Asumsikan ${Math.round(pot * 0.4)} - ${Math.round(pot * 0.7)} Chips`;
-      } else if (equity >= 55) {
-        action = "RAISE / CALL";
-        reason = "[PRE-FLOP] Tangan berpotensi tinggi. Mainkan agresif jika posisi bagus.";
-        betChips = `Asumsikan ${Math.round(pot * 0.25)} - ${Math.round(pot * 0.4)} Chips`;
+      if (oppBet > 0) {
+        const reqOdds = Math.round((oppBet / (pot + oppBet * 2)) * 100);
+        if (equity >= reqOdds) {
+          action = "CALL (PRE-FLOP)";
+          reason = `✅ <b>CALL ACCEPTED:</b> Equity pre-flop (${equity}%) sepadan dengan risiko taruhan lawan (${reqOdds}% Risk).`;
+          betChips = `Call ${oppBet} Chips`;
+        } else {
+          action = "FOLD (PRE-FLOP)";
+          reason = `🚨 <b>OVERPAY PRE-FLOP:</b> Taruhan raise lawan ${oppBet} Chips terlalu besar dibandingkan kekuatan tangan Anda.`;
+          betChips = "Fold";
+        }
       } else {
-        action = "FOLD / CHECK";
-        reason = "[PRE-FLOP] Tangan sangat berisiko, fold kecuali Anda ada di posisi Big Blind (gratis).";
-        betChips = "0 Chips";
+        if (equity >= 75) {
+          action = "RAISE (3x - 5x)";
+          reason = "[PRE-FLOP] Memegang Monster Hand! Buka raise untuk isolasi lawan.";
+          betChips = `Bet ${Math.round(pot * 0.5)} Chips`;
+        } else if (equity >= 50) {
+          action = "RAISE / CALL";
+          reason = "[PRE-FLOP] Tangan standar tinggi. Buka taruhan standar 2.5x BB.";
+          betChips = `Bet ${Math.round(pot * 0.3)} Chips`;
+        } else {
+          action = "CHECK / FOLD";
+          reason = "[PRE-FLOP] Kartu berisiko. Lakukan Check jika gratis, atau Fold jika di-raise.";
+          betChips = "0 Chips (Check)";
+        }
       }
-    } else {
-      if (myBestScore >= 7) { // Full House+
-        action = "ALL-IN / VALUE BET BESAR";
-        reason = "Kombinasi Monster Mutlak! Bet besar untuk menguras chip lawan maksimal.";
-        betChips = `${Math.round(pot * 0.8)} - ALL IN`;
-      } else if (myBestScore >= 5 || equity >= 75) { // Straight/Flush
-        action = "VALUE BET (75% Pot)";
-        reason = "Kombinasi Anda sangat kuat. Lakukan Value Bet untuk memancing call dari tangan yang lebih lemah.";
-        betChips = `${Math.round(pot * 0.75)} Chips`;
-      } else if (draws.length > 0) { // Draws
-        action = "SEMI-BLUFF / CALL (33% Pot)";
-        reason = `${draws[0].replace(/<\/?[^>]+(>|$)/g, "")} Peluang Anda tinggi. Bet 1/3 pot atau Call jika pot odds menguntungkan.`;
-        betChips = `${Math.round(pot * 0.33)} Chips`;
-      } else if (myBestScore >= 2 && equity >= 40) { // Top Pair
-        action = "BLOCK BET / CALL (25% Pot)";
-        reason = "Anda memegang Pair moderat. Lakukan taruhan kecil untuk mencegah lawan mengejar Draw.";
-        betChips = `${Math.round(pot * 0.25)} Chips`;
+      return { action, reason, betChips };
+    }
+
+    // 2. POST-FLOP (FLOP / TURN / RIVER) SAAT LAWAN BET / RAISE > 0
+    if (oppBet > 0) {
+      const totalPotAfterBet = pot + oppBet;
+      const requiredEquity = Math.round((oppBet / (totalPotAfterBet + oppBet)) * 100);
+      const stageName = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
+
+      if (equity >= requiredEquity) {
+        action = "CALL (WORTH IT)";
+        reason = `✅ <b>POT ODDS MASUK [${stageName}]:</b> Win Equity Anda (${equity}%) LEBIH BESAR dibanding Pot Odds yang diminta lawan (${requiredEquity}% Risk). Keputusan Call sangat menguntungkan (+EV).`;
+        betChips = `Call ${oppBet} Chips`;
+      } else {
+        action = "FOLD (OVERPAY)";
+        reason = `🚨 <b>TERLALU MAHAL [${stageName}]:</b> Lawan bet/raise ${oppBet} Chips (${requiredEquity}% Risk). Equity kartu Anda hanya ${equity}%. Mengejar kombinasi di sini rugi (-EV)!`;
+        betChips = `Fold (Kalah Odds)`;
       }
+      return { action, reason, betChips };
+    }
+
+    // 3. POST-FLOP SAAT LAWAN CHECK (OPPONENT BET = 0)
+    if (myBestScore >= 7) {
+      action = "ALL-IN / VALUE BET";
+      reason = "Kombinasi Monster terbentuk! Lakukan Value Bet besar untuk memancing pot.";
+      betChips = `Bet ${Math.round(pot * 0.8)} - ALL IN`;
+    } else if (myBestScore >= 5 || equity >= 75) {
+      action = "VALUE BET (75% Pot)";
+      reason = "Kombinasi Anda sangat kuat. Lakukan Value Bet 3/4 Pot untuk memaksimalkan kemenangan.";
+      betChips = `Bet ${Math.round(pot * 0.75)} Chips`;
+    } else if (draws.length > 0) {
+      const stageLabel = commCount === 3 ? "FLOP" : "TURN";
+      action = "SEMI-BLUFF / CHECK";
+      reason = `🎯 <b>[${stageLabel}] ${draws[0].replace(/<\/?[^>]+(>|$)/g, "")}</b> Lakukan Bet 1/3 Pot untuk Semi-Bluff atau Check gratis untuk membuka kartu berikutnya.`;
+      betChips = `Bet ${Math.round(pot * 0.33)} Chips`;
+    } else if (myBestScore >= 2 && equity >= 40) {
+      action = "BLOCK BET / CHECK";
+      reason = "Memegang Pair moderat. Lakukan taruhan kecil untuk mencegah lawan mengejar Draw murah.";
+      betChips = `Bet ${Math.round(pot * 0.25)} Chips`;
     }
 
     return { action, reason, betChips };
@@ -441,13 +486,13 @@ class PokerApp {
       } else comboBadgeContainer.innerHTML = '';
     }
 
-    // HITUNG BET DINAMIS (Memasukkan Input Total Pot)
+    // KALKULASI POT ODDS & AKSI
     const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
-    const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws, this.currentPot);
+    const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws, this.currentPot, this.opponentBet);
 
     if (this.stratAction) this.stratAction.textContent = advice.action;
     if (this.stratAmount) this.stratAmount.textContent = advice.betChips;
-    if (this.stratReason) this.stratReason.textContent = advice.reason;
+    if (this.stratReason) this.stratReason.innerHTML = advice.reason;
 
     const threats = PokerEvaluator.analyzeBoardThreats(this.communityCards, this.holeCards);
     if (this.boardThreats) {
