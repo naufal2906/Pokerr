@@ -86,7 +86,7 @@ export class PokerEvaluator {
     return [...new Set(draws)];
   }
 
-  // 3. ANALISIS ANCAMAN MEJA & PERLUASAN ANCAMAN OVERCARD/TOP PAIR
+  // 3. ANALISIS ANCAMAN MEJA & PERBAIKAN LOGIKA FOUR OF A KIND VS FULL HOUSE
   static analyzeBoardThreats(communityCards, holeCards = []) {
     const comm = this.getValidCards(communityCards);
     if (comm.length < 3) {
@@ -106,8 +106,6 @@ export class PokerEvaluator {
     const myScore = myBest ? myBest.score : 0; 
 
     const commRanks = comm.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
-    const maxRank = commRanks[0];
-    const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
 
     // Kembang Komunitas
     const suitCounts = {};
@@ -119,42 +117,51 @@ export class PokerEvaluator {
     const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] === maxSuitCount);
     const boardHasFlush = maxSuitCount >= 3;
 
-    // Pair / Trips Komunitas
+    // Pair / Three of a Kind Komunitas
     const rankCounts = {};
     commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
     const boardHasPair = Object.values(rankCounts).some(count => count >= 2);
-    const boardHasTrips = Object.values(rankCounts).some(count => count >= 3);
+    const boardHasThreeOfAKind = Object.values(rankCounts).some(count => count >= 3);
 
-    // ANALISIS ANCAMAN MULTI-LAYER & OVERCARDS
     let highestBoardComboName = "";
     let worstCaseMessage = "";
+    let absoluteMaxPossibleScore = 1;
 
-    if (boardHasTrips || boardHasPair) {
-      highestBoardComboName = boardHasTrips ? "Four of a Kind / Full House" : "Full House / Trips";
-      worstCaseMessage = `🏠 <b>MEJA BERPASANGAN:</b> Lawan yang memegang Set/Pair memiliki potensi Full House.`;
+    if (boardHasThreeOfAKind) {
+      absoluteMaxPossibleScore = 8; // Four of a Kind (Score 8)
+      highestBoardComboName = "Four of a Kind";
+      worstCaseMessage = `🚨 <b>ANCAMAN FOUR OF A KIND:</b> Ada Three of a Kind di meja! Lawan yang memegang kartu 1 lagi membentuk Four of a Kind yang mengalahkan Full House Anda.`;
+    } else if (boardHasPair) {
+      absoluteMaxPossibleScore = 7; // Full House (Score 7)
+      highestBoardComboName = "Full House / Three of a Kind";
+      worstCaseMessage = `🏠 <b>MEJA BERPASANGAN:</b> Waspada lawan memegang Set/Pair untuk membentuk Full House.`;
     } else if (boardHasFlush) {
+      absoluteMaxPossibleScore = 6; // Flush (Score 6)
       highestBoardComboName = `Flush (Kembang ${flushSuit})`;
-      worstCaseMessage = `🌊 <b>POTENSI FLUSH:</b> Meja memiliki 3+ kembang ${flushSuit}. Lawan dengan 2 kembang ${flushSuit} memegang Flush.`;
+      worstCaseMessage = `🌊 <b>POTENSI FLUSH:</b> Meja ada 3+ kembang ${flushSuit}. Lawan dengan kembang ${flushSuit} memegang Flush.`;
     } else {
+      absoluteMaxPossibleScore = 2; // Top Pair (Score 2)
+      const maxRank = commRanks[0];
+      const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
       highestBoardComboName = `Top Pair / Two Pair [Top Card ${maxLabel}]`;
-      worstCaseMessage = `👑 <b>ANCAMAN TOP PAIR / OVERCARD:</b> Lawan yang memegang kartu [${maxLabel}] membentuk <b>Top Pair (${maxLabel})</b> dengan Kicker tinggi.`;
+      worstCaseMessage = `👑 <b>ANCAMAN TOP PAIR:</b> Lawan yang memegang kartu [${maxLabel}] membentuk Top Pair.`;
     }
 
-    if (myScore >= 5) {
+    if (myScore < absoluteMaxPossibleScore) {
       threats.push({
-        text: `KARTU TANGAN DI ATAS POTENSI MEJA (^)`,
-        boardPotential: `Potensi Meja: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
-        worstCase: `✅ <b>DOMINAN:</b> Kombinasi Anda (${myBest.rankName}) menang di atas potensi meja saat ini.`,
-        indicator: "^",
-        safe: true
-      });
-    } else {
-      threats.push({
-        text: `POTENSI MEJA & OVERCARD LAWAN (v)`,
-        boardPotential: `Potensi Meja: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
+        text: `POTENSI MEJA DI ATAS KARTU TANGAN (v)`,
+        boardPotential: `Potensi Tertinggi Lawan: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
         worstCase: worstCaseMessage,
         indicator: "v",
         safe: false
+      });
+    } else {
+      threats.push({
+        text: `KARTU TANGAN DI ATAS POTENSI MEJA (^)`,
+        boardPotential: `Potensi Meja: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
+        worstCase: `✅ <b>MUTLAK / DOMINAN:</b> Kombinasi Anda (${myBest.rankName}) adalah kartu tertinggi mutlak di meja saat ini.`,
+        indicator: "^",
+        safe: true
       });
     }
 
@@ -250,7 +257,7 @@ export class PokerEvaluator {
       return { score: 7, rankName: `Full House (${tripCards} ${pairCards})`, cards: sorted.slice(0, 5) };
     }
 
-    // 4. FLUSH BIASA (HIRARKI TERATAS SEBELUM STRAIGHT)
+    // 4. FLUSH BIASA
     if (flushCards) {
       const topFlushCard = PokerEvaluator.formatCardText(flushCards[0]);
       return { score: 6, rankName: `Flush (${topFlushCard}-High)`, cards: flushCards.slice(0, 5) };
@@ -303,8 +310,8 @@ export class PokerEvaluator {
       };
     }
 
-    // 9. HIGH CARD DENGAN KETERANGAN
+    // 9. HIGH CARD
     const topCard = this.formatCardText(sorted[0]);
-    return { score: 1, rankName: `High Card (${topCard}) - Butuh Pair/Draw`, cards: sorted.slice(0, 5) };
+    return { score: 1, rankName: `High Card (${topCard})`, cards: sorted.slice(0, 5) };
   }
 }
