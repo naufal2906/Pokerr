@@ -204,73 +204,98 @@ export class PokerEvaluator {
     return Math.round(equity);
   }
 
-  // 5. PEMETAN 7 KOMBINASI RANGE LAWAN BERDASARKAN TOTAL 52 KARTU (CARD REMOVAL)
+  // 5. PEMETAN 7 RANGE LAWAN (MENDETEKSI SPESIFIK SEJAK 3 KARTU / FLOP)
   static getPossibleHandRanges(communityCards, holeCards = []) {
     const comm = this.getValidCards(communityCards);
     if (comm.length < 3) return [];
 
-    const hole = this.getValidCards(holeCards);
-    const knownCards = [...hole, ...comm];
-
     const commRanks = comm.map(c => this.getCardValue(c)).sort((a, b) => b - a);
     const commSuits = comm.map(c => this.getCardSuitSymbol(c));
 
+    // Deteksi Kembang
     const suitCounts = {};
     commSuits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
     const maxSuitCount = Math.max(...Object.values(suitCounts));
-    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] === maxSuitCount) || '';
+    const dominantSuit = Object.keys(suitCounts).find(s => suitCounts[s] === maxSuitCount) || '♦';
 
+    // Deteksi Pair / Angka Meja
     const rankCounts = {};
     commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
-    const hasPair = Object.values(rankCounts).some(v => v >= 2);
-    const hasTrips = Object.values(rankCounts).some(v => v >= 3);
-
     const topRank = commRanks[0];
-    const topLabel = topRank === 14 ? 'A' : topRank === 13 ? 'K' : topRank === 12 ? 'Q' : topRank === 11 ? 'J' : topRank;
+    const topLabel = this.getCardLabel(comm.find(c => this.getCardValue(c) === topRank));
 
-    // MATRIKS 7 KOMBINASI LENGKAP POKER
+    // Deteksi Celah Straight
+    const uniqueRanks = [...new Set(commRanks)].sort((a, b) => a - b);
+    if (uniqueRanks.includes(14)) uniqueRanks.unshift(1);
+    
+    const neededForStraight = [];
+    for (let target = 2; target <= 14; target++) {
+      const windowRanks = uniqueRanks.filter(r => r >= target - 4 && r <= target);
+      if (windowRanks.length >= 2) {
+        for (let check = target - 4; check <= target; check++) {
+          if (check >= 1 && !uniqueRanks.includes(check)) {
+            const lbl = check === 1 || check === 14 ? 'A' : check === 13 ? 'K' : check === 12 ? 'Q' : check === 11 ? 'J' : String(check);
+            if (!neededForStraight.includes(lbl)) neededForStraight.push(lbl);
+          }
+        }
+      }
+    }
+
+    const straightCardsText = neededForStraight.length > 0 ? neededForStraight.slice(0, 3).join(', ') : '10, 8, 7';
+
+    // MATRIKS 7 RANGE LAWAN (DIURUTKAN DARI FREKUENSI PALING SERING KELUAR -> LANGKA)
     return [
       {
-        category: "1. 👑 Straight / Royal Flush",
-        hands: flushSuit ? [`Suited Connector ${flushSuit}`, `High Suited ${flushSuit}`] : ["Kombinasi Spesial Kembang Sama"],
-        type: "Suited",
-        danger: maxSuitCount >= 3 ? "HIGH" : "MEDIUM"
-      },
-      {
-        category: "2. 🚨 Four of a Kind (Quads)",
-        hands: hasTrips ? [`1 Kartu Sisa [${topLabel}] di Tangan`] : [`Pocket Pair Menjadi 4-of-a-Kind`],
-        type: "Pocket Pair / Single",
-        danger: hasTrips ? "HIGH" : "MEDIUM"
-      },
-      {
-        category: "3. 🏠 Full House",
-        hands: hasPair ? [`Pocket Pair + Pair Board`, `Set + Pair Board`] : [`3 Cards Matching Board`],
+        category: "1. 🛡️ Overpair / Top Pair & Kicker (Sangat Sering)",
+        hands: [`Overpair (AA-77) atau Top Pair [A${topLabel}, K${topLabel}]`],
         type: "Suited & Offsuit",
-        danger: hasPair ? "HIGH" : "MEDIUM"
+        danger: "MEDIUM"
       },
       {
-        category: "4. 🌊 Flush (Kembang Sama)",
-        hands: maxSuitCount >= 3 ? [`2 Kartu Kembang ${flushSuit}`] : [`Butuh 2/1 Kartu ${flushSuit} Lagi`],
-        type: "Suited",
-        danger: maxSuitCount >= 3 ? "HIGH" : "MEDIUM"
-      },
-      {
-        category: "5. 🎯 Straight (Urutan Angka)",
-        hands: ["Koneksi Urutan Atas", "Koneksi Urutan Bawah", "Gutsy Draw"],
-        type: "Suited & Offsuit",
-        danger: "HIGH"
-      },
-      {
-        category: "6. ⚡ Three of a Kind / Two Pair",
-        hands: [`Pocket Pair (${topLabel}${topLabel})`, `Hit Pair Board [${topLabel} + Low]`],
+        category: "2. ⚡ Three of a Kind / Two Pair (Cukup Sering)",
+        hands: [`Pocket Pair Set (${topLabel}${topLabel}) atau Hit 2 Pair [${topLabel} + Low]`],
         type: "Pocket Pair / Connectors",
         danger: "MEDIUM"
       },
       {
-        category: "7. 🛡️ Overpair / Top Pair & Kicker",
-        hands: [`AA, KK, QQ, JJ, TT`, `A${topLabel}s, A${topLabel}o, K${topLabel}s`],
+        category: "3. 🎯 Straight / Urutan Angka (Jarang)",
+        hands: [`Lawan memegang kartu angka spesifik: [ ${straightCardsText} ]`],
         type: "Suited & Offsuit",
-        danger: "MEDIUM"
+        danger: "HIGH"
+      },
+      {
+        category: "4. 🌊 Flush / Kembang Sama (Jarang)",
+        hands: maxSuitCount >= 3 
+          ? [`SUDAH FLUSH: 2 kartu kembang ${dominantSuit} (A${dominantSuit} X${dominantSuit})`]
+          : maxSuitCount === 2 
+            ? [`FLUSH DRAW: 2 kartu kembang ${dominantSuit} di tangan`]
+            : [`BACKDOOR FLUSH: Butuh 2 kartu ${dominantSuit} di Turn & River`],
+        type: "Suited",
+        danger: maxSuitCount >= 3 ? "HIGH" : "MEDIUM"
+      },
+      {
+        category: "5. 🏠 Full House (Sangat Langka)",
+        hands: Object.values(rankCounts).some(v => v >= 2)
+          ? [`Set / Pair kombinasi board (${commRanks.slice(0, 2).map(r => this.getCardLabel({value:r})).join('')})`]
+          : [`Set (${topLabel}${topLabel}) mengejar Full House`],
+        type: "Suited & Offsuit",
+        danger: Object.values(rankCounts).some(v => v >= 2) ? "HIGH" : "MEDIUM"
+      },
+      {
+        category: "6. 🚨 Four of a Kind / Quads (Langka)",
+        hands: Object.values(rankCounts).includes(3)
+          ? [`1 kartu [${topLabel}] tersisa di tangan lawan`]
+          : [`Pocket Pair matching board (${topLabel}${topLabel})`],
+        type: "Pocket Pair / Single",
+        danger: Object.values(rankCounts).some(v => v >= 2) ? "HIGH" : "MEDIUM"
+      },
+      {
+        category: "7. 👑 Royal / Straight Flush (Super Rare)",
+        hands: maxSuitCount >= 3 
+          ? [`2 kartu kembang ${dominantSuit} urutan (${straightCardsText}${dominantSuit})`]
+          : [`Butuh 2 kartu kembang sama + urutan`],
+        type: "Suited",
+        danger: maxSuitCount >= 3 ? "HIGH" : "MEDIUM"
       }
     ];
   }
