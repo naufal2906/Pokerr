@@ -14,19 +14,12 @@ class PokerApp {
   }
 
   getCardRankLabel(card) {
-    if (!card) return '';
-    if (card.rank) return card.rank.label || card.rank.name || card.rank.value || card.rank;
-    return card.label || card.name || card.value || '';
+    return PokerEvaluator.getCardLabel(card);
   }
 
   getCardSuitInfo(card) {
-    if (!card) return { symbol: '', color: 'black' };
-    let symbol = '';
-    let color = 'black';
-    if (card.suit) {
-      symbol = card.suit.symbol || card.suit.name || card.suit;
-      color = card.suit.color || (symbol === '♥' || symbol === '♦' ? 'red' : 'black');
-    }
+    const symbol = PokerEvaluator.getCardSuitSymbol(card);
+    const color = (symbol === '♥' || symbol === '♦') ? 'red' : 'black';
     return { symbol, color };
   }
 
@@ -55,7 +48,6 @@ class PokerApp {
     this.closeModalBtn = document.getElementById('close-modal');
     this.targetLabel = document.getElementById('target-label');
 
-    // ACCORDION HAND RANGE MATRIX DOM
     this.toggleRangeBtn = document.getElementById('toggleRangeBtn');
     this.rangeContent = document.getElementById('rangeContent');
     this.rangeArrow = document.getElementById('rangeArrow');
@@ -89,8 +81,8 @@ class PokerApp {
     suits.forEach(suit => {
       const row = document.createElement('div');
       row.className = 'suit-row';
-      const suitSym = suit.symbol || suit.name || suit;
-      const suitCol = suit.color || (suitSym === '♥' || suitSym === '♦' ? 'red' : 'black');
+      const suitSym = suit.symbol || suit;
+      const suitCol = (suitSym === '♥' || suitSym === '♦') ? 'red' : 'black';
 
       const label = document.createElement('div');
       label.className = `suit-label ${suitCol}`;
@@ -101,7 +93,7 @@ class PokerApp {
       rankContainer.className = 'rank-buttons';
 
       RANKS.forEach(rank => {
-        const rankLbl = rank.label || rank.name || rank.value || rank;
+        const rankLbl = rank.label || String(rank.value || rank);
         const btn = document.createElement('button');
         btn.className = `btn-card-select ${suitCol}`;
         btn.textContent = rankLbl;
@@ -116,7 +108,6 @@ class PokerApp {
   }
 
   bindEvents() {
-    // EVENT TOGGLE ACCORDION RANGE KARTU LAWAN
     if (this.toggleRangeBtn) {
       this.toggleRangeBtn.addEventListener('click', () => {
         if (this.rangeContent) this.rangeContent.classList.toggle('hidden');
@@ -205,7 +196,7 @@ class PokerApp {
 
   renderCardSlot(element, card) {
     if (!element) return;
-    if (card && card.rank && card.suit) {
+    if (card && PokerEvaluator.getCardValue(card) > 0) {
       const rankLabel = this.getCardRankLabel(card);
       const suitInfo = this.getCardSuitInfo(card);
 
@@ -231,10 +222,10 @@ class PokerApp {
     }
   }
 
-  // RENDER HAND RANGE MATRIX KE DALAM ACCORDION
-  renderHandRange(communityCards) {
+  // RENDER MATRIKS 7 RANGE KARTU LAWAN
+  renderHandRange(communityCards, holeCards) {
     if (!this.handRangeContainer) return;
-    const ranges = PokerEvaluator.getPossibleHandRanges(communityCards);
+    const ranges = PokerEvaluator.getPossibleHandRanges(communityCards, holeCards);
 
     if (ranges.length === 0) {
       this.handRangeContainer.innerHTML = `<div style="color: #777; font-size: 0.8rem; text-align: center; padding: 6px;">Menunggu Flop (Minimal 3 Kartu Komunitas)...</div>`;
@@ -254,123 +245,7 @@ class PokerApp {
     `).join('');
   }
 
-  // 1. PROYEKSI KARTU TANGAN
-  getDynamicHoleProjections(holeCards, communityCards) {
-    const validHole = PokerEvaluator.getValidCards(holeCards);
-    const validComm = PokerEvaluator.getValidCards(communityCards);
-    if (validHole.length < 2) return [];
-
-    const allCards = [...validHole, ...validComm];
-    const myBest = PokerEvaluator.getBestHand(allCards);
-    const commCount = validComm.length;
-
-    if (commCount === 0) {
-      const v1 = validHole[0].rank ? validHole[0].rank.value : validHole[0].value;
-      const v2 = validHole[1].rank ? validHole[1].rank.value : validHole[1].value;
-      const s1 = this.getCardSuitInfo(validHole[0]).symbol;
-      const s2 = this.getCardSuitInfo(validHole[1]).symbol;
-
-      if (v1 === v2) return ["Three of a Kind", "Full House", "Four of a Kind", "Two Pair"];
-      const res = [];
-      if (s1 === s2) res.push(`Flush (${s1})`);
-      if (Math.abs(v1 - v2) <= 4 || (v1 === 14 && v2 <= 5) || (v2 === 14 && v1 <= 5)) res.push("Straight");
-      res.push("Top Pair", "Two Pair");
-      return res;
-    }
-
-    if (commCount === 5) return [`Kombinasi Final: ${myBest.rankName}`];
-
-    const proj = [];
-    const suitCounts = {};
-    allCards.forEach(c => {
-      const s = this.getCardSuitInfo(c).symbol;
-      suitCounts[s] = (suitCounts[s] || 0) + 1;
-    });
-
-    Object.keys(suitCounts).forEach(s => {
-      const count = suitCounts[s];
-      if (count === 4) proj.push(`Flush Draw (Butuh 1 Kartu ${s})`);
-      else if (count === 3 && commCount === 3) proj.push(`Backdoor Flush (Butuh 2 Kartu ${s})`);
-    });
-
-    const draws = PokerEvaluator.detectDraws(holeCards, communityCards);
-    draws.forEach(d => {
-      if (d.includes("Straight Draw")) proj.push(d.replace(/<\/?[^>]+(>|$)/g, ""));
-    });
-
-    if (myBest.score >= 5) proj.push(`${myBest.rankName}`);
-    else if (myBest.score === 4) proj.push("Three of a Kind", "Full House");
-    else if (myBest.score === 3) proj.push("Two Pair", "Full House");
-    else if (myBest.score === 2) proj.push(`${myBest.rankName.split('-')[0].trim()}`, "Two Pair");
-    else if (myBest.score === 1 && proj.length === 0) proj.push("High Card");
-
-    return [...new Set(proj)];
-  }
-
-  // 2. STRUKTUR MEJA 
-  getBoardOnlyAnalysis(communityCards) {
-    const validComm = PokerEvaluator.getValidCards(communityCards);
-    const commCount = validComm.length;
-    if (commCount < 3) return "";
-
-    const commRanks = validComm.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
-    const commSuits = {};
-    validComm.forEach(c => {
-      const s = this.getCardSuitInfo(c).symbol;
-      commSuits[s] = (commSuits[s] || 0) + 1;
-    });
-
-    const maxSuitCount = Math.max(...Object.values(commSuits));
-    const flushSuit = Object.keys(commSuits).find(s => commSuits[s] === maxSuitCount);
-    
-    const rankCounts = {};
-    commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
-
-    const pairedRanks = Object.keys(rankCounts).filter(r => rankCounts[r] >= 2).map(Number).sort((a, b) => b - a);
-
-    const maxRank = commRanks[0];
-    const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
-    const maxSuitCard = validComm.find(c => (c.rank ? c.rank.value : c.value) === maxRank);
-    const maxSuitSym = maxSuitCard ? this.getCardSuitInfo(maxSuitCard).symbol : '';
-
-    let boardStructureLabel = "";
-    if (pairedRanks.length > 0) {
-      const topPairVal = pairedRanks[0];
-      const topPairLabel = topPairVal === 14 ? 'A' : topPairVal === 13 ? 'K' : topPairVal === 12 ? 'Q' : topPairVal === 11 ? 'J' : topPairVal;
-      boardStructureLabel = `Pair di Meja [${topPairLabel}${topPairLabel}]`;
-    } else {
-      boardStructureLabel = `High Card Meja [${maxLabel}${maxSuitSym}]`;
-    }
-
-    const possibilities = [];
-
-    if (maxSuitCount >= 5) possibilities.push(`Flush Murni di Meja (${flushSuit})`);
-    else if (maxSuitCount === 4) possibilities.push(`Flush (1 Kartu ${flushSuit})`);
-    else if (maxSuitCount === 3) possibilities.push(`Flush Draw (3 Kartu ${flushSuit})`);
-
-    if (pairedRanks.length >= 2) possibilities.push("Full House", "Two Pair");
-    else if (pairedRanks.length === 1) possibilities.push("Three of a Kind", "Full House");
-
-    const uniqueRanks = [...new Set(commRanks)].sort((a, b) => a - b);
-    if (uniqueRanks.includes(14)) uniqueRanks.unshift(1);
-
-    let straightPossible = false;
-    for (let target = 2; target <= 14; target++) {
-      const windowCards = uniqueRanks.filter(r => r >= target - 4 && r <= target);
-      if (windowCards.length >= 3) {
-        straightPossible = true;
-        break;
-      }
-    }
-
-    if (straightPossible) possibilities.push("Koneksi Straight");
-    if (possibilities.length === 0) possibilities.push(`Top Pair [${maxLabel}]`);
-
-    const stageLabel = commCount === 3 ? "FLOP" : commCount === 4 ? "TURN" : "RIVER";
-    return `[${stageLabel}] Struktur Meja: <b>${boardStructureLabel}</b> | Potensi Terkuat Lawan (${possibilities.length} Kombinasi): <b>${possibilities.join(' / ')}</b>`;
-  }
-
-  // 3. NOMINAL CHIPS (BLIND 300/600)
+  // REKOMENDASI NOMINAL CHIPS (+EV)
   getBettingAdvice(equity, myBestScore, commCount, draws) {
     let action = "CHECK / FOLD";
     let reason = "Tangan lemah. Disarankan Check gratis, atau Fold jika di-raise lawan.";
@@ -447,20 +322,7 @@ class PokerApp {
 
     if (this.holeOnlyHand) this.holeOnlyHand.textContent = PokerEvaluator.evaluateHoleCardsOnly(this.holeCards);
 
-    let holeProjectionContainer = document.getElementById('hole-projection-badge-element');
-    if (!holeProjectionContainer && this.handCardsContainer) {
-      holeProjectionContainer = document.createElement('div');
-      holeProjectionContainer.id = 'hole-projection-badge-element';
-      this.handCardsContainer.after(holeProjectionContainer);
-    }
-
-    if (validHole.length === 2 && holeProjectionContainer) {
-      const projections = this.getDynamicHoleProjections(this.holeCards, this.communityCards);
-      holeProjectionContainer.innerHTML = `<div class="combo-green-badge" style="background: rgba(0, 240, 255, 0.08); border-color: rgba(0, 240, 255, 0.3); color: #00f0ff;"><span>🎯 Proyeksi Kombinasi Tangan (${projections.length} Kombinasi): <b>${projections.join(' / ')}</b></span></div>`;
-    } else if (holeProjectionContainer) holeProjectionContainer.innerHTML = '';
-
-    // RENDER HAND RANGE MATRIX
-    this.renderHandRange(this.communityCards);
+    this.renderHandRange(this.communityCards, this.holeCards);
 
     if (validHole.length < 2) {
       if (this.myBestHand) this.myBestHand.textContent = "-";
@@ -476,38 +338,15 @@ class PokerApp {
       return;
     }
 
-    // HITUNG PROYEKSI DENGAN CARD REMOVAL / BLOCKER EFFECT
-    const oppCombos = PokerEvaluator.calculateOpponentCombinations(this.holeCards, this.communityCards);
     const equity = PokerEvaluator.calculateStrength(this.holeCards, this.communityCards);
-
     if (this.strengthBar) this.strengthBar.style.width = `${equity}%`;
-    if (this.strengthPercent) {
-      if (oppCombos.length > 0) {
-        this.strengthPercent.textContent = `${equity}% (A-A Lawan: ${oppCombos[0].percentage})`;
-      } else {
-        this.strengthPercent.textContent = `${equity}%`;
-      }
-    }
+    if (this.strengthPercent) this.strengthPercent.textContent = `${equity}%`;
 
     const myBest = PokerEvaluator.getBestHand([...validHole, ...validComm]);
     let comboText = myBest.rankName;
-    if (validComm.length === 0 && comboText.includes('- Kicker []')) comboText = comboText.replace(' - Kicker []', '');
 
     if (this.myBestHand) this.myBestHand.textContent = comboText;
     if (this.resultName) this.resultName.textContent = comboText;
-
-    let comboBadgeContainer = document.getElementById('combo-green-badge-element');
-    if (!comboBadgeContainer && this.communityCardsContainer) {
-      comboBadgeContainer = document.createElement('div');
-      comboBadgeContainer.id = 'combo-green-badge-element';
-      this.communityCardsContainer.after(comboBadgeContainer);
-    }
-    if (comboBadgeContainer) {
-      if (validComm.length >= 3) {
-        const boardAnalysis = this.getBoardOnlyAnalysis(this.communityCards);
-        comboBadgeContainer.innerHTML = `<div class="combo-green-badge"><span class="badge-icon">⚡</span><span>${boardAnalysis}</span></div>`;
-      } else comboBadgeContainer.innerHTML = '';
-    }
 
     const draws = PokerEvaluator.detectDraws(this.holeCards, this.communityCards);
     const advice = this.getBettingAdvice(equity, myBest.score, validComm.length, draws);
