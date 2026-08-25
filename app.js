@@ -55,6 +55,12 @@ class PokerApp {
     this.closeModalBtn = document.getElementById('close-modal');
     this.targetLabel = document.getElementById('target-label');
 
+    // ACCORDION HAND RANGE MATRIX DOM
+    this.toggleRangeBtn = document.getElementById('toggleRangeBtn');
+    this.rangeContent = document.getElementById('rangeContent');
+    this.rangeArrow = document.getElementById('rangeArrow');
+    this.handRangeContainer = document.getElementById('handRangeContainer');
+
     this.generateModalCardGrid();
   }
 
@@ -110,6 +116,14 @@ class PokerApp {
   }
 
   bindEvents() {
+    // EVENT TOGGLE ACCORDION RANGE KARTU LAWAN
+    if (this.toggleRangeBtn) {
+      this.toggleRangeBtn.addEventListener('click', () => {
+        if (this.rangeContent) this.rangeContent.classList.toggle('hidden');
+        if (this.rangeArrow) this.rangeArrow.classList.toggle('active');
+      });
+    }
+
     document.addEventListener('click', (e) => {
       if (e.target.classList.contains('remove-card-btn')) {
         e.stopPropagation();
@@ -217,7 +231,30 @@ class PokerApp {
     }
   }
 
-  // 1. PROYEKSI KARTU TANGAN DENGAN PERHITUNGAN TOTAL KOMBINASI
+  // RENDER HAND RANGE MATRIX KE DALAM ACCORDION
+  renderHandRange(communityCards) {
+    if (!this.handRangeContainer) return;
+    const ranges = PokerEvaluator.getPossibleHandRanges(communityCards);
+
+    if (ranges.length === 0) {
+      this.handRangeContainer.innerHTML = `<div style="color: #777; font-size: 0.8rem; text-align: center; padding: 6px;">Menunggu Flop (Minimal 3 Kartu Komunitas)...</div>`;
+      return;
+    }
+
+    this.handRangeContainer.innerHTML = ranges.map(item => `
+      <div class="range-item ${item.danger}">
+        <div class="range-title">
+          <span>${item.category}</span>
+          <small style="color: ${item.danger === 'HIGH' ? '#ff2a5f' : '#ffca28'};">[${item.type}]</small>
+        </div>
+        <div class="range-details">
+          Kombinasi: <b>${item.hands.join(', ')}</b>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // 1. PROYEKSI KARTU TANGAN
   getDynamicHoleProjections(holeCards, communityCards) {
     const validHole = PokerEvaluator.getValidCards(holeCards);
     const validComm = PokerEvaluator.getValidCards(communityCards);
@@ -233,7 +270,7 @@ class PokerApp {
       const s1 = this.getCardSuitInfo(validHole[0]).symbol;
       const s2 = this.getCardSuitInfo(validHole[1]).symbol;
 
-      if (v1 === v2) return ["Set (Trips)", "Full House", "Quads", "Two Pair"];
+      if (v1 === v2) return ["Three of a Kind", "Full House", "Four of a Kind", "Two Pair"];
       const res = [];
       if (s1 === s2) res.push(`Flush (${s1})`);
       if (Math.abs(v1 - v2) <= 4 || (v1 === 14 && v2 <= 5) || (v2 === 14 && v1 <= 5)) res.push("Straight");
@@ -262,7 +299,7 @@ class PokerApp {
     });
 
     if (myBest.score >= 5) proj.push(`${myBest.rankName}`);
-    else if (myBest.score === 4) proj.push("Set/Trips", "Full House");
+    else if (myBest.score === 4) proj.push("Three of a Kind", "Full House");
     else if (myBest.score === 3) proj.push("Two Pair", "Full House");
     else if (myBest.score === 2) proj.push(`${myBest.rankName.split('-')[0].trim()}`, "Two Pair");
     else if (myBest.score === 1 && proj.length === 0) proj.push("High Card");
@@ -270,7 +307,7 @@ class PokerApp {
     return [...new Set(proj)];
   }
 
-  // 2. STRUKTUR MEJA DENGAN PERHITUNGAN TOTAL KOMBINASI
+  // 2. STRUKTUR MEJA 
   getBoardOnlyAnalysis(communityCards) {
     const validComm = PokerEvaluator.getValidCards(communityCards);
     const commCount = validComm.length;
@@ -312,7 +349,7 @@ class PokerApp {
     else if (maxSuitCount === 3) possibilities.push(`Flush Draw (3 Kartu ${flushSuit})`);
 
     if (pairedRanks.length >= 2) possibilities.push("Full House", "Two Pair");
-    else if (pairedRanks.length === 1) possibilities.push("Trips", "Full House");
+    else if (pairedRanks.length === 1) possibilities.push("Three of a Kind", "Full House");
 
     const uniqueRanks = [...new Set(commRanks)].sort((a, b) => a - b);
     if (uniqueRanks.includes(14)) uniqueRanks.unshift(1);
@@ -333,14 +370,14 @@ class PokerApp {
     return `[${stageLabel}] Struktur Meja: <b>${boardStructureLabel}</b> | Potensi Terkuat Lawan (${possibilities.length} Kombinasi): <b>${possibilities.join(' / ')}</b>`;
   }
 
-  // 3. NOMINAL CHIPS FLEKSIBEL (BLIND 300/600)
+  // 3. NOMINAL CHIPS (BLIND 300/600)
   getBettingAdvice(equity, myBestScore, commCount, draws) {
     let action = "CHECK / FOLD";
     let reason = "Tangan lemah. Disarankan Check gratis, atau Fold jika di-raise lawan.";
     let betChips = "0 Chips";
     let maxCallChips = "0 Chips";
 
-    if (commCount === 0) { // PRE-FLOP (BLIND 300/600)
+    if (commCount === 0) { 
       if (equity >= 75) {
         action = "RAISE / RE-RAISE";
         reason = "🔥 <b>MONSTER PRE-FLOP:</b> Tangan sangat kuat! Buka Raise/Re-Raise ke 2,400 - 3,600 Chips.";
@@ -360,7 +397,6 @@ class PokerApp {
       return { action, reason, betChips, maxCallChips };
     }
 
-    // POST-FLOP (FLOP, TURN, RIVER)
     if (myBestScore >= 7) { 
       action = "SLOWPLAY / VALUE BET";
       reason = "🏆 <b>NUT HAND:</b> Dorong taruhan Value Bet besar 3,600 - 6,000 Chips untuk menguras stack lawan.";
@@ -423,6 +459,9 @@ class PokerApp {
       holeProjectionContainer.innerHTML = `<div class="combo-green-badge" style="background: rgba(0, 240, 255, 0.08); border-color: rgba(0, 240, 255, 0.3); color: #00f0ff;"><span>🎯 Proyeksi Kombinasi Tangan (${projections.length} Kombinasi): <b>${projections.join(' / ')}</b></span></div>`;
     } else if (holeProjectionContainer) holeProjectionContainer.innerHTML = '';
 
+    // RENDER HAND RANGE MATRIX
+    this.renderHandRange(this.communityCards);
+
     if (validHole.length < 2) {
       if (this.myBestHand) this.myBestHand.textContent = "-";
       if (this.strengthBar) this.strengthBar.style.width = "0%";
@@ -437,9 +476,18 @@ class PokerApp {
       return;
     }
 
+    // HITUNG PROYEKSI DENGAN CARD REMOVAL / BLOCKER EFFECT
+    const oppCombos = PokerEvaluator.calculateOpponentCombinations(this.holeCards, this.communityCards);
     const equity = PokerEvaluator.calculateStrength(this.holeCards, this.communityCards);
+
     if (this.strengthBar) this.strengthBar.style.width = `${equity}%`;
-    if (this.strengthPercent) this.strengthPercent.textContent = `${equity}%`;
+    if (this.strengthPercent) {
+      if (oppCombos.length > 0) {
+        this.strengthPercent.textContent = `${equity}% (A-A Lawan: ${oppCombos[0].percentage})`;
+      } else {
+        this.strengthPercent.textContent = `${equity}%`;
+      }
+    }
 
     const myBest = PokerEvaluator.getBestHand([...validHole, ...validComm]);
     let comboText = myBest.rankName;
