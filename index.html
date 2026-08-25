@@ -29,7 +29,7 @@
           <div>Kombinasi Kartu Tangan: <span id="hole-only-hand" class="highlight-cyan">-</span></div>
           <div>Kombinasi Tangan + Meja: <span id="my-best-hand" class="highlight-green">-</span></div>
           <div class="strength-meter-inline">
-            <span>Win Equity:</span>
+            <span>Proyeksi Kombinasi:</span>
             <div class="progress-bar-bg">
               <div id="strength-bar" class="progress-bar-fill"></div>
             </div>
@@ -38,7 +38,7 @@
         </div>
       </div>
 
-      <!-- SECTION 2: KARTU KOMUNITAS -->
+      <!-- SECTION 2: KARTU KOMUNITAS & RANGE MATRIX -->
       <div class="section">
         <div class="section-header">
           <h2>Kartu Komunitas (Board)</h2>
@@ -48,6 +48,19 @@
         </div>
         
         <div id="community-cards" class="card-group"></div>
+
+        <!-- RANGE KARTU LAWAN ACCORDION (BUKA-TUTUP) -->
+        <div class="range-accordion" style="margin-top: 12px;">
+          <button type="button" id="toggleRangeBtn" class="accordion-btn">
+            <span>🎯 <b>Range Kartu Lawan (Hand Range Matrix)</b></span>
+            <span id="rangeArrow" class="arrow-icon">▼</span>
+          </button>
+          <div id="rangeContent" class="accordion-content hidden">
+            <div id="handRangeContainer" class="range-matrix-grid">
+              <!-- Peta Range Kartu dimasukkan secara dinamis lewat JS -->
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- SECTION 3: STRATEGI BETTING & KALKULASI NOMINAL CHIPS (BLIND 300/600) -->
