@@ -86,7 +86,7 @@ export class PokerEvaluator {
     return [...new Set(draws)];
   }
 
-  // 3. ANALISIS ANCAMAN MEJA & PERBAIKAN LOGIKA FOUR OF A KIND VS FULL HOUSE
+  // 3. ANALISIS ANCAMAN MEJA & STRUKTUR
   static analyzeBoardThreats(communityCards, holeCards = []) {
     const comm = this.getValidCards(communityCards);
     if (comm.length < 3) {
@@ -106,6 +106,8 @@ export class PokerEvaluator {
     const myScore = myBest ? myBest.score : 0; 
 
     const commRanks = comm.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
+    const maxRank = commRanks[0];
+    const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
 
     // Kembang Komunitas
     const suitCounts = {};
@@ -123,76 +125,147 @@ export class PokerEvaluator {
     const boardHasPair = Object.values(rankCounts).some(count => count >= 2);
     const boardHasThreeOfAKind = Object.values(rankCounts).some(count => count >= 3);
 
+    let boardStructureText = "";
     let highestBoardComboName = "";
     let worstCaseMessage = "";
     let absoluteMaxPossibleScore = 1;
 
     if (boardHasThreeOfAKind) {
-      absoluteMaxPossibleScore = 8; // Four of a Kind (Score 8)
+      boardStructureText = `Three of a Kind di Meja [Top Card ${maxLabel}]`;
+      absoluteMaxPossibleScore = 8;
       highestBoardComboName = "Four of a Kind";
-      worstCaseMessage = `🚨 <b>ANCAMAN FOUR OF A KIND:</b> Ada Three of a Kind di meja! Lawan yang memegang kartu 1 lagi membentuk Four of a Kind yang mengalahkan Full House Anda.`;
+      worstCaseMessage = `🚨 <b>ANCAMAN FOUR OF A KIND:</b> Ada Three of a Kind di meja! Lawan yang memegang 1 kartu tersisa membentuk Four of a Kind.`;
     } else if (boardHasPair) {
-      absoluteMaxPossibleScore = 7; // Full House (Score 7)
+      boardStructureText = `Pair di Meja [Top Card ${maxLabel}]`;
+      absoluteMaxPossibleScore = 7;
       highestBoardComboName = "Full House / Three of a Kind";
       worstCaseMessage = `🏠 <b>MEJA BERPASANGAN:</b> Waspada lawan memegang Set/Pair untuk membentuk Full House.`;
     } else if (boardHasFlush) {
-      absoluteMaxPossibleScore = 6; // Flush (Score 6)
+      boardStructureText = `Koneksi Flush (${maxSuitCount} Kembang ${flushSuit})`;
+      absoluteMaxPossibleScore = 6;
       highestBoardComboName = `Flush (Kembang ${flushSuit})`;
       worstCaseMessage = `🌊 <b>POTENSI FLUSH:</b> Meja ada 3+ kembang ${flushSuit}. Lawan dengan kembang ${flushSuit} memegang Flush.`;
     } else {
-      absoluteMaxPossibleScore = 2; // Top Pair (Score 2)
-      const maxRank = commRanks[0];
-      const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
+      boardStructureText = `High Card Meja [${maxLabel}]`;
+      absoluteMaxPossibleScore = 2;
       highestBoardComboName = `Top Pair / Two Pair [Top Card ${maxLabel}]`;
       worstCaseMessage = `👑 <b>ANCAMAN TOP PAIR:</b> Lawan yang memegang kartu [${maxLabel}] membentuk Top Pair.`;
     }
 
-    if (myScore < absoluteMaxPossibleScore) {
-      threats.push({
-        text: `POTENSI MEJA DI ATAS KARTU TANGAN (v)`,
-        boardPotential: `Potensi Tertinggi Lawan: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
-        worstCase: worstCaseMessage,
-        indicator: "v",
-        safe: false
-      });
-    } else {
-      threats.push({
-        text: `KARTU TANGAN DI ATAS POTENSI MEJA (^)`,
-        boardPotential: `Potensi Meja: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
-        worstCase: `✅ <b>MUTLAK / DOMINAN:</b> Kombinasi Anda (${myBest.rankName}) adalah kartu tertinggi mutlak di meja saat ini.`,
-        indicator: "^",
-        safe: true
-      });
-    }
+    const isSafe = myScore >= absoluteMaxPossibleScore;
+    threats.push({
+      text: `[${comm.length === 3 ? 'FLOP' : comm.length === 4 ? 'TURN' : 'RIVER'}] Struktur Meja: ${boardStructureText}`,
+      boardPotential: `Potensi Terkuat Lawan: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
+      worstCase: isSafe ? `✅ <b>DOMINAN:</b> Kombinasi Anda (${myBest.rankName}) adalah yang tertinggi di meja saat ini.` : worstCaseMessage,
+      indicator: isSafe ? "^" : "v",
+      safe: isSafe
+    });
 
     return threats;
   }
 
-  // 4. MENGHITUNG WIN EQUITY
-  static calculateStrength(holeCards, communityCards) {
+  // 4. PERHITUNGAN PROYEKSI KOMBINASI LAWAN & PERSENTASE (BLOCKER EFFECT)
+  static calculateOpponentCombinations(holeCards, communityCards) {
     const validHand = this.getValidCards(holeCards);
-    if (validHand.length < 2) return 0;
-
     const validComm = this.getValidCards(communityCards);
-    const best = this.getBestHand([...validHand, ...validComm]);
+    const knownCards = [...validHand, ...validComm];
 
-    if (validComm.length === 0) {
-      const v1 = validHand[0].rank ? validHand[0].rank.value : validHand[0].value;
-      const v2 = validHand[1].rank ? validHand[1].rank.value : validHand[1].value;
-      if (v1 === v2) return Math.min(85, 50 + v1 * 2.5);
-      return Math.min(65, 20 + Math.max(v1, v2) * 2.5);
-    }
+    if (validHand.length < 2) return [];
 
-    const scoreMap = { 10: 100, 9: 99, 8: 98, 7: 92, 6: 88, 5: 80, 4: 65, 3: 55, 2: 40, 1: 20 };
-    let equity = scoreMap[best.score] || 20;
+    // Hitung sisa kartu Ace di dek
+    const knownValues = knownCards.map(c => c.rank ? c.rank.value : c.value);
+    const acesSeen = knownValues.filter(v => v === 14).length;
+    const remainingAces = 4 - acesSeen;
 
-    const draws = this.detectDraws(validHand, validComm);
-    if (draws.length > 0) equity = Math.min(92, equity + 12);
+    const totalCardsInDeck = 52 - knownCards.length;
+    const totalOpponentCombos = (totalCardsInDeck * (totalCardsInDeck - 1)) / 2;
 
-    return Math.round(equity);
+    const pairAceCombos = (remainingAces * (remainingAces - 1)) / 2;
+    const singleAceCombos = remainingAces * (totalCardsInDeck - remainingAces);
+
+    const pairAcePercent = Math.max(0, ((pairAceCombos / totalOpponentCombos) * 100).toFixed(1));
+    const singleAcePercent = Math.max(0, ((singleAceCombos / totalOpponentCombos) * 100).toFixed(1));
+
+    const combinations = [];
+
+    combinations.push({
+      name: `Lawan Memegang Pocket Pair Ace (A-A)`,
+      percentage: `${pairAcePercent}%`,
+      detail: `Sisa ${remainingAces} Ace di deck.`
+    });
+
+    combinations.push({
+      name: `Lawan Memegang Minimal 1 Ace (High Card / Top Pair A)`,
+      percentage: `${singleAcePercent}%`,
+      detail: `Sisa ${remainingAces} Ace di deck.`
+    });
+
+    const myBest = this.getBestHand(knownCards);
+    combinations.push({
+      name: `Kombinasi Terbaik Tangan Anda saat ini`,
+      percentage: `100%`,
+      detail: myBest.rankName
+    });
+
+    return combinations;
   }
 
-  // 5. EVALUASI LENGKAP 5 KARTU TERBAIK
+  // 5. PEMETAN RANGE KARTU LAWAN BERDASARKAN MEJA (HAND RANGE MATRIX)
+  static getPossibleHandRanges(communityCards) {
+    const comm = this.getValidCards(communityCards);
+    if (comm.length < 3) return [];
+
+    const ranges = [];
+    const ranks = comm.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
+    const suits = comm.map(c => this.getCardSuitSymbol(c));
+
+    // A. Deteksi Koneksi Straight
+    ranges.push({
+      category: "🎯 Straight Made (Koneksi Urutan)",
+      hands: ["Koneksi Atas", "Koneksi Bawah"],
+      type: "Suited & Offsuit",
+      danger: "HIGH"
+    });
+
+    // B. Deteksi Pair / Set di Meja
+    const rankLabels = [...new Set(comm.map(c => c.rank ? c.rank.label : (c.label || c.value)))];
+    const setHands = rankLabels.map(lbl => `${lbl}${lbl}`);
+    ranges.push({
+      category: "🏠 Set / Three of a Kind",
+      hands: setHands, 
+      type: "Pocket Pair",
+      danger: "HIGH"
+    });
+
+    // C. Deteksi Flush Draw / Flush
+    const suitCounts = {};
+    suits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
+    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] >= 2);
+
+    if (flushSuit) {
+      ranges.push({
+        category: `🌊 Flush Draw / Backdoor (${flushSuit})`,
+        hands: [`A${flushSuit} X${flushSuit}`, `K${flushSuit} X${flushSuit}`, `Suited ${flushSuit}`],
+        type: "Suited",
+        danger: "MEDIUM"
+      });
+    }
+
+    // D. Overpairs & Top Pair
+    const maxRankLabel = comm.find(c => (c.rank ? c.rank.value : c.value) === ranks[0]);
+    const topLabel = maxRankLabel ? (maxRankLabel.rank ? maxRankLabel.rank.label : maxRankLabel.value) : '';
+
+    ranges.push({
+      category: `👑 Overpair & Top Pair [${topLabel}]`,
+      hands: ["AA", "KK", "QQ", "JJ", "TT", "99", "88", "77", `A${topLabel}o`, `A${topLabel}s`],
+      type: "Suited & Offsuit",
+      danger: "MEDIUM"
+    });
+
+    return ranges;
+  }
+
+  // 6. EVALUASI LENGKAP 5 KARTU TERBAIK
   static getBestHand(cards) {
     const valid = this.getValidCards(cards);
     if (valid.length === 0) return { score: 0, rankName: "-", cards: [] };
@@ -217,7 +290,6 @@ export class PokerEvaluator {
       if (suitGroups[s].length >= 5) flushCards = suitGroups[s];
     });
 
-    // 1. STRAIGHT FLUSH & ROYAL FLUSH
     if (flushCards) {
       const fValues = [...new Set(flushCards.map(c => c.rank ? c.rank.value : c.value))].sort((a, b) => b - a);
       if (fValues.includes(14)) fValues.push(1);
@@ -243,13 +315,11 @@ export class PokerEvaluator {
     const tripKeys = Object.keys(counts).filter(k => counts[k].length === 3).map(Number).sort((a, b) => b - a);
     const pairKeys = Object.keys(counts).filter(k => counts[k].length === 2).map(Number).sort((a, b) => b - a);
 
-    // 2. FOUR OF A KIND
     if (quadKeys.length > 0) {
       const quadCards = counts[quadKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       return { score: 8, rankName: `Four of a Kind (${quadCards})`, cards: sorted.slice(0, 5) };
     }
 
-    // 3. FULL HOUSE
     if (tripKeys.length > 0 && (pairKeys.length > 0 || tripKeys.length > 1)) {
       const tripCards = counts[tripKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       const pVal = tripKeys.length > 1 ? tripKeys[1] : pairKeys[0];
@@ -257,13 +327,11 @@ export class PokerEvaluator {
       return { score: 7, rankName: `Full House (${tripCards} ${pairCards})`, cards: sorted.slice(0, 5) };
     }
 
-    // 4. FLUSH BIASA
     if (flushCards) {
       const topFlushCard = PokerEvaluator.formatCardText(flushCards[0]);
       return { score: 6, rankName: `Flush (${topFlushCard}-High)`, cards: flushCards.slice(0, 5) };
     }
 
-    // 5. STRAIGHT BIASA
     const straightVals = [...values];
     if (straightVals.includes(14)) straightVals.push(1);
 
@@ -283,20 +351,17 @@ export class PokerEvaluator {
       }
     }
 
-    // 6. THREE OF A KIND
     if (tripKeys.length === 1) {
       const tripCards = counts[tripKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       return { score: 4, rankName: `Three of a Kind (${tripCards})`, cards: sorted.slice(0, 5) };
     }
 
-    // 7. TWO PAIR
     if (pairKeys.length >= 2) {
       const p1 = counts[pairKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       const p2 = counts[pairKeys[1]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
       return { score: 3, rankName: `Two Pair (${p1} & ${p2})`, cards: sorted.slice(0, 5) };
     }
 
-    // 8. ONE PAIR
     if (pairKeys.length === 1) {
       const pairVal = pairKeys[0];
       const pairCards = counts[pairVal].map(c => PokerEvaluator.formatCardText(c)).join(' ');
@@ -310,7 +375,6 @@ export class PokerEvaluator {
       };
     }
 
-    // 9. HIGH CARD
     const topCard = this.formatCardText(sorted[0]);
     return { score: 1, rankName: `High Card (${topCard})`, cards: sorted.slice(0, 5) };
   }
