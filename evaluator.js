@@ -1,20 +1,40 @@
 import { RANKS, SUITS } from './card.js';
 
 export class PokerEvaluator {
-  static getValidCards(cards) {
-    return (cards || []).filter(c => c && (c.rank || c.value));
+  // HELPER MENGAMBIL VALUE & SUIT KARTU DENGAN AMAN
+  static getCardValue(card) {
+    if (!card) return 0;
+    if (typeof card.value === 'number') return card.value;
+    if (card.rank && typeof card.rank.value === 'number') return card.rank.value;
+    return 0;
   }
 
-  static formatCardText(card) {
+  static getCardLabel(card) {
     if (!card) return '';
-    const label = card.rank ? card.rank.label : (card.label || card.value);
-    const symbol = card.suit ? (card.suit.symbol || card.suit) : '';
-    return `${label}${symbol}`;
+    if (card.rank && card.rank.label) return card.rank.label;
+    if (card.label) return card.label;
+    if (card.value) {
+      const v = card.value;
+      return v === 14 ? 'A' : v === 13 ? 'K' : v === 12 ? 'Q' : v === 11 ? 'J' : String(v);
+    }
+    return '';
   }
 
   static getCardSuitSymbol(card) {
     if (!card) return '';
-    return card.suit ? (card.suit.symbol || card.suit) : '';
+    if (card.suit && card.suit.symbol) return card.suit.symbol;
+    if (typeof card.suit === 'string') return card.suit;
+    if (card.symbol) return card.symbol;
+    return '';
+  }
+
+  static getValidCards(cards) {
+    return (cards || []).filter(c => c && (this.getCardValue(c) > 0));
+  }
+
+  static formatCardText(card) {
+    if (!card) return '';
+    return `${this.getCardLabel(card)}${this.getCardSuitSymbol(card)}`;
   }
 
   // 1. EVALUASI KARTU TANGAN MURNI
@@ -22,18 +42,16 @@ export class PokerEvaluator {
     const valid = this.getValidCards(holeCards);
     if (valid.length < 2) return "Pilih 2 Kartu Tangan";
 
-    const c1 = valid[0];
-    const c2 = valid[1];
-    const txt1 = this.formatCardText(c1);
-    const txt2 = this.formatCardText(c2);
+    const txt1 = this.formatCardText(valid[0]);
+    const txt2 = this.formatCardText(valid[1]);
 
-    const v1 = c1.rank ? c1.rank.value : c1.value;
-    const v2 = c2.rank ? c2.rank.value : c2.value;
+    const v1 = this.getCardValue(valid[0]);
+    const v2 = this.getCardValue(valid[1]);
 
     if (v1 === v2) return `Pocket Pair (${txt1} ${txt2})`;
 
-    const s1 = this.getCardSuitSymbol(c1);
-    const s2 = this.getCardSuitSymbol(c2);
+    const s1 = this.getCardSuitSymbol(valid[0]);
+    const s2 = this.getCardSuitSymbol(valid[1]);
     const type = (s1 === s2) ? "Suited" : "Offsuit";
 
     return `${txt1} ${txt2} (${type})`;
@@ -48,7 +66,7 @@ export class PokerEvaluator {
     if (myBest && myBest.score >= 5) return [];
 
     const draws = [];
-    const values = [...new Set(all.map(c => c.rank ? c.rank.value : c.value))].sort((a, b) => a - b);
+    const values = [...new Set(all.map(c => this.getCardValue(c)))].sort((a, b) => a - b);
     
     // Flush Draw
     const suitCounts = {};
@@ -105,11 +123,10 @@ export class PokerEvaluator {
     const myBest = this.getBestHand(totalCards);
     const myScore = myBest ? myBest.score : 0; 
 
-    const commRanks = comm.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
+    const commRanks = comm.map(c => this.getCardValue(c)).sort((a, b) => b - a);
     const maxRank = commRanks[0];
     const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
 
-    // Kembang Komunitas
     const suitCounts = {};
     comm.forEach(c => {
       const s = this.getCardSuitSymbol(c);
@@ -119,7 +136,6 @@ export class PokerEvaluator {
     const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] === maxSuitCount);
     const boardHasFlush = maxSuitCount >= 3;
 
-    // Pair / Three of a Kind Komunitas
     const rankCounts = {};
     commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
     const boardHasPair = Object.values(rankCounts).some(count => count >= 2);
@@ -164,105 +180,99 @@ export class PokerEvaluator {
     return threats;
   }
 
-  // 4. PERHITUNGAN PROYEKSI KOMBINASI LAWAN & PERSENTASE (BLOCKER EFFECT)
-  static calculateOpponentCombinations(holeCards, communityCards) {
+  // 4. MENGHITUNG WIN EQUITY
+  static calculateStrength(holeCards, communityCards) {
     const validHand = this.getValidCards(holeCards);
+    if (validHand.length < 2) return 0;
+
     const validComm = this.getValidCards(communityCards);
-    const knownCards = [...validHand, ...validComm];
+    const best = this.getBestHand([...validHand, ...validComm]);
 
-    if (validHand.length < 2) return [];
+    if (validComm.length === 0) {
+      const v1 = this.getCardValue(validHand[0]);
+      const v2 = this.getCardValue(validHand[1]);
+      if (v1 === v2) return Math.min(90, Math.round(55 + v1 * 2.5));
+      return Math.min(70, Math.round(20 + Math.max(v1, v2) * 2.5));
+    }
 
-    // Hitung sisa kartu Ace di dek
-    const knownValues = knownCards.map(c => c.rank ? c.rank.value : c.value);
-    const acesSeen = knownValues.filter(v => v === 14).length;
-    const remainingAces = 4 - acesSeen;
+    const scoreMap = { 10: 100, 9: 99, 8: 98, 7: 92, 6: 88, 5: 80, 4: 65, 3: 55, 2: 40, 1: 20 };
+    let equity = scoreMap[best.score] || 20;
 
-    const totalCardsInDeck = 52 - knownCards.length;
-    const totalOpponentCombos = (totalCardsInDeck * (totalCardsInDeck - 1)) / 2;
+    const draws = this.detectDraws(validHand, validComm);
+    if (draws.length > 0) equity = Math.min(92, equity + 12);
 
-    const pairAceCombos = (remainingAces * (remainingAces - 1)) / 2;
-    const singleAceCombos = remainingAces * (totalCardsInDeck - remainingAces);
-
-    const pairAcePercent = Math.max(0, ((pairAceCombos / totalOpponentCombos) * 100).toFixed(1));
-    const singleAcePercent = Math.max(0, ((singleAceCombos / totalOpponentCombos) * 100).toFixed(1));
-
-    const combinations = [];
-
-    combinations.push({
-      name: `Lawan Memegang Pocket Pair Ace (A-A)`,
-      percentage: `${pairAcePercent}%`,
-      detail: `Sisa ${remainingAces} Ace di deck.`
-    });
-
-    combinations.push({
-      name: `Lawan Memegang Minimal 1 Ace (High Card / Top Pair A)`,
-      percentage: `${singleAcePercent}%`,
-      detail: `Sisa ${remainingAces} Ace di deck.`
-    });
-
-    const myBest = this.getBestHand(knownCards);
-    combinations.push({
-      name: `Kombinasi Terbaik Tangan Anda saat ini`,
-      percentage: `100%`,
-      detail: myBest.rankName
-    });
-
-    return combinations;
+    return Math.round(equity);
   }
 
-  // 5. PEMETAN RANGE KARTU LAWAN BERDASARKAN MEJA (HAND RANGE MATRIX)
-  static getPossibleHandRanges(communityCards) {
+  // 5. PEMETAN 7 KOMBINASI RANGE LAWAN BERDASARKAN TOTAL 52 KARTU (CARD REMOVAL)
+  static getPossibleHandRanges(communityCards, holeCards = []) {
     const comm = this.getValidCards(communityCards);
     if (comm.length < 3) return [];
 
-    const ranges = [];
-    const ranks = comm.map(c => c.rank ? c.rank.value : c.value).sort((a, b) => b - a);
-    const suits = comm.map(c => this.getCardSuitSymbol(c));
+    const hole = this.getValidCards(holeCards);
+    const knownCards = [...hole, ...comm];
 
-    // A. Deteksi Koneksi Straight
-    ranges.push({
-      category: "🎯 Straight Made (Koneksi Urutan)",
-      hands: ["Koneksi Atas", "Koneksi Bawah"],
-      type: "Suited & Offsuit",
-      danger: "HIGH"
-    });
+    const commRanks = comm.map(c => this.getCardValue(c)).sort((a, b) => b - a);
+    const commSuits = comm.map(c => this.getCardSuitSymbol(c));
 
-    // B. Deteksi Pair / Set di Meja
-    const rankLabels = [...new Set(comm.map(c => c.rank ? c.rank.label : (c.label || c.value)))];
-    const setHands = rankLabels.map(lbl => `${lbl}${lbl}`);
-    ranges.push({
-      category: "🏠 Set / Three of a Kind",
-      hands: setHands, 
-      type: "Pocket Pair",
-      danger: "HIGH"
-    });
-
-    // C. Deteksi Flush Draw / Flush
     const suitCounts = {};
-    suits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
-    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] >= 2);
+    commSuits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
+    const maxSuitCount = Math.max(...Object.values(suitCounts));
+    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] === maxSuitCount) || '';
 
-    if (flushSuit) {
-      ranges.push({
-        category: `🌊 Flush Draw / Backdoor (${flushSuit})`,
-        hands: [`A${flushSuit} X${flushSuit}`, `K${flushSuit} X${flushSuit}`, `Suited ${flushSuit}`],
+    const rankCounts = {};
+    commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
+    const hasPair = Object.values(rankCounts).some(v => v >= 2);
+    const hasTrips = Object.values(rankCounts).some(v => v >= 3);
+
+    const topRank = commRanks[0];
+    const topLabel = topRank === 14 ? 'A' : topRank === 13 ? 'K' : topRank === 12 ? 'Q' : topRank === 11 ? 'J' : topRank;
+
+    // MATRIKS 7 KOMBINASI LENGKAP POKER
+    return [
+      {
+        category: "1. 👑 Straight / Royal Flush",
+        hands: flushSuit ? [`Suited Connector ${flushSuit}`, `High Suited ${flushSuit}`] : ["Kombinasi Spesial Kembang Sama"],
         type: "Suited",
+        danger: maxSuitCount >= 3 ? "HIGH" : "MEDIUM"
+      },
+      {
+        category: "2. 🚨 Four of a Kind (Quads)",
+        hands: hasTrips ? [`1 Kartu Sisa [${topLabel}] di Tangan`] : [`Pocket Pair Menjadi 4-of-a-Kind`],
+        type: "Pocket Pair / Single",
+        danger: hasTrips ? "HIGH" : "MEDIUM"
+      },
+      {
+        category: "3. 🏠 Full House",
+        hands: hasPair ? [`Pocket Pair + Pair Board`, `Set + Pair Board`] : [`3 Cards Matching Board`],
+        type: "Suited & Offsuit",
+        danger: hasPair ? "HIGH" : "MEDIUM"
+      },
+      {
+        category: "4. 🌊 Flush (Kembang Sama)",
+        hands: maxSuitCount >= 3 ? [`2 Kartu Kembang ${flushSuit}`] : [`Butuh 2/1 Kartu ${flushSuit} Lagi`],
+        type: "Suited",
+        danger: maxSuitCount >= 3 ? "HIGH" : "MEDIUM"
+      },
+      {
+        category: "5. 🎯 Straight (Urutan Angka)",
+        hands: ["Koneksi Urutan Atas", "Koneksi Urutan Bawah", "Gutsy Draw"],
+        type: "Suited & Offsuit",
+        danger: "HIGH"
+      },
+      {
+        category: "6. ⚡ Three of a Kind / Two Pair",
+        hands: [`Pocket Pair (${topLabel}${topLabel})`, `Hit Pair Board [${topLabel} + Low]`],
+        type: "Pocket Pair / Connectors",
         danger: "MEDIUM"
-      });
-    }
-
-    // D. Overpairs & Top Pair
-    const maxRankLabel = comm.find(c => (c.rank ? c.rank.value : c.value) === ranks[0]);
-    const topLabel = maxRankLabel ? (maxRankLabel.rank ? maxRankLabel.rank.label : maxRankLabel.value) : '';
-
-    ranges.push({
-      category: `👑 Overpair & Top Pair [${topLabel}]`,
-      hands: ["AA", "KK", "QQ", "JJ", "TT", "99", "88", "77", `A${topLabel}o`, `A${topLabel}s`],
-      type: "Suited & Offsuit",
-      danger: "MEDIUM"
-    });
-
-    return ranges;
+      },
+      {
+        category: "7. 🛡️ Overpair / Top Pair & Kicker",
+        hands: [`AA, KK, QQ, JJ, TT`, `A${topLabel}s, A${topLabel}o, K${topLabel}s`],
+        type: "Suited & Offsuit",
+        danger: "MEDIUM"
+      }
+    ];
   }
 
   // 6. EVALUASI LENGKAP 5 KARTU TERBAIK
@@ -270,17 +280,12 @@ export class PokerEvaluator {
     const valid = this.getValidCards(cards);
     if (valid.length === 0) return { score: 0, rankName: "-", cards: [] };
 
-    const sorted = [...valid].sort((a, b) => {
-      const va = a.rank ? a.rank.value : a.value;
-      const vb = b.rank ? b.rank.value : b.value;
-      return vb - va;
-    });
-
-    const values = [...new Set(sorted.map(c => c.rank ? c.rank.value : c.value))].sort((a, b) => b - a);
+    const sorted = [...valid].sort((a, b) => this.getCardValue(b) - this.getCardValue(a));
+    const values = [...new Set(sorted.map(c => this.getCardValue(c)))].sort((a, b) => b - a);
 
     const suitGroups = {};
     sorted.forEach(c => {
-      const s = PokerEvaluator.getCardSuitSymbol(c);
+      const s = this.getCardSuitSymbol(c);
       suitGroups[s] = suitGroups[s] || [];
       suitGroups[s].push(c);
     });
@@ -291,7 +296,7 @@ export class PokerEvaluator {
     });
 
     if (flushCards) {
-      const fValues = [...new Set(flushCards.map(c => c.rank ? c.rank.value : c.value))].sort((a, b) => b - a);
+      const fValues = [...new Set(flushCards.map(c => this.getCardValue(c)))].sort((a, b) => b - a);
       if (fValues.includes(14)) fValues.push(1);
       
       for (let i = 0; i <= fValues.length - 5; i++) {
@@ -306,7 +311,7 @@ export class PokerEvaluator {
 
     const counts = {};
     sorted.forEach(c => {
-      const v = c.rank ? c.rank.value : c.value;
+      const v = this.getCardValue(c);
       counts[v] = counts[v] || [];
       counts[v].push(c);
     });
@@ -316,19 +321,19 @@ export class PokerEvaluator {
     const pairKeys = Object.keys(counts).filter(k => counts[k].length === 2).map(Number).sort((a, b) => b - a);
 
     if (quadKeys.length > 0) {
-      const quadCards = counts[quadKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      const quadCards = counts[quadKeys[0]].map(c => this.formatCardText(c)).join(' ');
       return { score: 8, rankName: `Four of a Kind (${quadCards})`, cards: sorted.slice(0, 5) };
     }
 
     if (tripKeys.length > 0 && (pairKeys.length > 0 || tripKeys.length > 1)) {
-      const tripCards = counts[tripKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      const tripCards = counts[tripKeys[0]].map(c => this.formatCardText(c)).join(' ');
       const pVal = tripKeys.length > 1 ? tripKeys[1] : pairKeys[0];
-      const pairCards = counts[pVal].slice(0, 2).map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      const pairCards = counts[pVal].slice(0, 2).map(c => this.formatCardText(c)).join(' ');
       return { score: 7, rankName: `Full House (${tripCards} ${pairCards})`, cards: sorted.slice(0, 5) };
     }
 
     if (flushCards) {
-      const topFlushCard = PokerEvaluator.formatCardText(flushCards[0]);
+      const topFlushCard = this.formatCardText(flushCards[0]);
       return { score: 6, rankName: `Flush (${topFlushCard}-High)`, cards: flushCards.slice(0, 5) };
     }
 
@@ -343,7 +348,7 @@ export class PokerEvaluator {
         const straightCards = [];
         for (let k = 0; k < 5; k++) {
           const targetV = topV - k === 1 ? 14 : topV - k;
-          const matchCard = sorted.find(c => (c.rank ? c.rank.value : c.value) === targetV);
+          const matchCard = sorted.find(c => this.getCardValue(c) === targetV);
           if (matchCard) straightCards.push(matchCard);
         }
 
@@ -352,21 +357,21 @@ export class PokerEvaluator {
     }
 
     if (tripKeys.length === 1) {
-      const tripCards = counts[tripKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      const tripCards = counts[tripKeys[0]].map(c => this.formatCardText(c)).join(' ');
       return { score: 4, rankName: `Three of a Kind (${tripCards})`, cards: sorted.slice(0, 5) };
     }
 
     if (pairKeys.length >= 2) {
-      const p1 = counts[pairKeys[0]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      const p2 = counts[pairKeys[1]].map(c => PokerEvaluator.formatCardText(c)).join(' ');
+      const p1 = counts[pairKeys[0]].map(c => this.formatCardText(c)).join(' ');
+      const p2 = counts[pairKeys[1]].map(c => this.formatCardText(c)).join(' ');
       return { score: 3, rankName: `Two Pair (${p1} & ${p2})`, cards: sorted.slice(0, 5) };
     }
 
     if (pairKeys.length === 1) {
       const pairVal = pairKeys[0];
-      const pairCards = counts[pairVal].map(c => PokerEvaluator.formatCardText(c)).join(' ');
-      const kickers = sorted.filter(c => (c.rank ? c.rank.value : c.value) !== pairVal);
-      const topKicker = kickers.length > 0 ? PokerEvaluator.formatCardText(kickers[0]) : '';
+      const pairCards = counts[pairVal].map(c => this.formatCardText(c)).join(' ');
+      const kickers = sorted.filter(c => this.getCardValue(c) !== pairVal);
+      const topKicker = kickers.length > 0 ? this.formatCardText(kickers[0]) : '';
 
       return { 
         score: 2, 
