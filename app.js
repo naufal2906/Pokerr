@@ -222,7 +222,6 @@ class PokerApp {
     }
   }
 
-  // RENDER MATRIKS 7 RANGE KARTU LAWAN
   renderHandRange(communityCards, holeCards) {
     if (!this.handRangeContainer) return;
     const ranges = PokerEvaluator.getPossibleHandRanges(communityCards, holeCards);
@@ -245,7 +244,6 @@ class PokerApp {
     `).join('');
   }
 
-  // REKOMENDASI NOMINAL CHIPS (+EV)
   getBettingAdvice(equity, myBestScore, commCount, draws) {
     let action = "CHECK / FOLD";
     let reason = "Tangan lemah. Disarankan Check gratis, atau Fold jika di-raise lawan.";
