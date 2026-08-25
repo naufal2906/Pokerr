@@ -61,7 +61,7 @@ body {
     #ff0055
   );
   background-size: 300% 300%;
-  animation: rgbGlow 3.5s ease infinite; /* Kecepatan gerakan lampu (3.5 detik) */
+  animation: rgbGlow 3.5s ease infinite; /* Kecepatan gerakan lampu */
   max-width: 520px;
   width: 100%;
   box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
@@ -264,6 +264,90 @@ h2 {
 
 .highlight-cyan { color: var(--accent-color); font-weight: 700; }
 .highlight-green { color: var(--success-color); font-weight: 700; }
+
+/* ACCORDION HAND RANGE MATRIX (BISA DIBUKA/DITUTUP) */
+.range-accordion {
+  margin-top: 10px;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.accordion-btn {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 240, 255, 0.05);
+  border: none;
+  color: var(--accent-color);
+  font-size: 0.83rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.accordion-btn:hover {
+  background: rgba(0, 240, 255, 0.12);
+}
+
+.arrow-icon {
+  font-size: 0.75rem;
+  transition: transform 0.3s ease;
+  color: #fff;
+}
+
+.arrow-icon.active {
+  transform: rotate(180deg);
+}
+
+.accordion-content {
+  padding: 10px;
+  max-height: 500px;
+  opacity: 1;
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+.accordion-content.hidden {
+  max-height: 0;
+  padding: 0 10px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.range-matrix-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.range-item {
+  background: rgba(15, 23, 42, 0.7);
+  padding: 8px 10px;
+  border-radius: 8px;
+  border-left: 3px solid var(--accent-color);
+  font-size: 0.8rem;
+}
+
+.range-item.HIGH { border-left-color: var(--danger-color); }
+.range-item.MEDIUM { border-left-color: var(--warning-color); }
+
+.range-title {
+  font-weight: bold;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.range-details {
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.35;
+}
 
 /* Style Khusus Kartu Strategi */
 .strategy-card {
