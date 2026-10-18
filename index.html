@@ -2,11 +2,15 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Poker Evaluator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Poker Evaluator Pro</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
+
   <div class="rgb-card-container">
     <div class="main-card">
       
@@ -14,7 +18,7 @@
       <h1 class="glow-title">POKER EVALUATOR</h1>
       <div class="symbols">♠ ♥ ♣ ♦</div>
 
-      <!-- SECTION 1: KARTU TANGAN -->
+      <!-- SECTION 1: KARTU TANGAN & REAL-TIME ODDS -->
       <div class="section">
         <div class="section-header">
           <h2>Kartu Tangan Anda (Hole Cards)</h2>
@@ -28,8 +32,9 @@
         <div class="status-box">
           <div>Kombinasi Kartu Tangan: <span id="hole-only-hand" class="highlight-cyan">-</span></div>
           <div>Kombinasi Tangan + Meja: <span id="my-best-hand" class="highlight-green">-</span></div>
+          
           <div class="strength-meter-inline">
-            <span>Proyeksi Kombinasi:</span>
+            <span>Win Equity / Odds:</span>
             <div class="progress-bar-bg">
               <div id="strength-bar" class="progress-bar-fill"></div>
             </div>
@@ -49,15 +54,15 @@
         
         <div id="community-cards" class="card-group"></div>
 
-        <!-- RANGE KARTU LAWAN ACCORDION (BUKA-TUTUP) -->
-        <div class="range-accordion" style="margin-top: 12px;">
+        <!-- ACCORDION HAND RANGE MATRIX (7 KOMBINASI LAWAN) -->
+        <div class="range-accordion">
           <button type="button" id="toggleRangeBtn" class="accordion-btn">
             <span>🎯 <b>Range Kartu Lawan (Hand Range Matrix)</b></span>
             <span id="rangeArrow" class="arrow-icon">▼</span>
           </button>
           <div id="rangeContent" class="accordion-content hidden">
             <div id="handRangeContainer" class="range-matrix-grid">
-              <!-- Peta Range Kartu dimasukkan secara dinamis lewat JS -->
+              <!-- Render 7 Range Kartu Spesifik lewat JS -->
             </div>
           </div>
         </div>
@@ -67,19 +72,19 @@
       <div class="section strategy-card">
         <h2>Saran Strategi & Nominal Betting (Blind 300/600)</h2>
 
-        <div class="strategy-body" style="margin-top: 10px;">
+        <div class="strategy-body">
           <div class="strategy-action-container">
             <span class="strategy-label">Rekomendasi Aksi:</span>
             <span id="strat-action" class="action-badge">WAIT</span>
           </div>
 
           <!-- REKOMENDASI NOMINAL CHIPS (+EV) -->
-          <div style="display: flex; flex-direction: column; gap: 8px; margin: 12px 0; background: rgba(0,0,0,0.35); padding: 12px; border-radius: 8px; border: 1px solid rgba(0, 240, 255, 0.15);">
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+          <div style="display: flex; flex-direction: column; gap: 8px; margin: 10px 0; background: rgba(0,0,0,0.35); padding: 12px; border-radius: 10px; border: 1px solid rgba(0, 240, 255, 0.15);">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
               <span style="color: var(--text-muted); font-weight: 600;">Batas Maksimal Call (+EV):</span>
               <span id="max-call-prob" style="color: var(--accent-color); font-weight: 800; font-size: 0.95rem;">0 Chips</span>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
               <span style="color: var(--text-muted); font-weight: 600;">Estimasi Raise/Bet Ideal:</span>
               <span id="strat-amount" style="color: var(--warning-color); font-weight: 800; font-size: 0.95rem;">0 Chips</span>
             </div>
@@ -98,7 +103,7 @@
 
         <hr class="divider">
 
-        <p style="font-size: 0.85rem; color: #a0aec0; margin-bottom: 5px;">Kombinasi Final Terbaik saat Ini:</p>
+        <p style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 6px; text-align: left;">Kombinasi Final Terbaik saat Ini:</p>
         <div id="result-name" class="glow-text">-</div>
         <div id="best-cards" class="card-group"></div>
       </div>
@@ -110,7 +115,7 @@
   <div id="card-picker-modal" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 style="margin:0; font-size:1.1rem; color: var(--accent-color);">Pilih Kartu (<span id="target-label">Slot</span>)</h3>
+        <h3 style="margin:0; font-size:1.05rem; color: var(--accent-color);">Pilih Kartu (<span id="target-label">Slot</span>)</h3>
         <span id="close-modal" class="close-btn">&times;</span>
       </div>
       <div id="full-card-grid" class="full-card-grid"></div>
