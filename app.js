@@ -322,6 +322,8 @@ class PokerApp {
 
     this.renderHandRange(this.communityCards, this.holeCards);
 
+    const projContainer = document.getElementById('hole-projection-container');
+
     if (validHole.length < 2) {
       if (this.myBestHand) this.myBestHand.textContent = "-";
       if (this.strengthBar) this.strengthBar.style.width = "0%";
@@ -333,12 +335,28 @@ class PokerApp {
       if (this.boardThreats) this.boardThreats.innerHTML = '';
       if (this.resultName) this.resultName.textContent = "-";
       if (this.bestCardsContainer) this.bestCardsContainer.innerHTML = '';
+      if (projContainer) projContainer.innerHTML = '';
       return;
     }
 
+    // WIN EQUITY
     const equity = PokerEvaluator.calculateStrength(this.holeCards, this.communityCards);
     if (this.strengthBar) this.strengthBar.style.width = `${equity}%`;
     if (this.strengthPercent) this.strengthPercent.textContent = `${equity}%`;
+
+    // PROYEKSI OUTS & ODDS COMBINATION
+    const improvement = PokerEvaluator.calculateHandImprovementOdds(this.holeCards, this.communityCards);
+    if (projContainer) {
+      projContainer.innerHTML = `
+        <div class="combo-green-badge" style="margin-top: 10px;">
+          <span class="badge-icon">🎯</span>
+          <div>
+            <div><b>${improvement.text}</b> — Peluang: <b>${improvement.percent}%</b></div>
+            <small style="color: #cbd5e1;">Syarat: ${improvement.neededCards}</small>
+          </div>
+        </div>
+      `;
+    }
 
     const myBest = PokerEvaluator.getBestHand([...validHole, ...validComm]);
     let comboText = myBest.rankName;
