@@ -1,12 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@700&display=swap');
 
 :root {
-  --bg-color: #070a12;
-  --card-bg: rgba(15, 21, 36, 0.88);
+  --bg-color: #060911;
+  --card-bg: rgba(13, 19, 33, 0.82);
   --accent-color: #00f0ff;
   --success-color: #00ff87;
   --danger-color: #ff2a5f;
   --warning-color: #ffca28;
+  --purple-accent: #a855f7;
   --text-color: #f8fafc;
   --text-muted: #94a3b8;
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -18,39 +19,34 @@
   padding: 0;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   background-color: var(--bg-color);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(0, 240, 255, 0.08) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(247, 0, 255, 0.06) 0px, transparent 50%);
+    radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(168, 85, 247, 0.08) 0%, transparent 40%);
   color: var(--text-color);
   margin: 0;
-  padding: 16px 8px;
+  padding: 12px 6px;
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
 }
 
-/* ANIMASI RGB RUNNING BORDER BERGERAK MEWAH */
+/* CONTAINER RGB RUNNING BORDER ULTRA MODERN */
 @keyframes rgbGlow {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .rgb-card-container {
   position: relative;
-  border-radius: 20px;
-  padding: 3px; /* Ketebalan border RGB */
+  border-radius: 22px;
+  padding: 2.5px;
   background: linear-gradient(
     60deg, 
     #ff0055, 
@@ -61,21 +57,17 @@ body {
     #ff0055
   );
   background-size: 300% 300%;
-  animation: rgbGlow 3.5s ease infinite; /* Kecepatan gerakan lampu */
-  max-width: 520px;
+  animation: rgbGlow 4s linear infinite;
+  max-width: 500px;
   width: 100%;
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 }
 
-/* EFEK PANCARAN GLOW CAHAYA NEON DI BELAKANG CONTAINER */
 .rgb-card-container::after {
   content: '';
   position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  border-radius: 22px;
+  inset: -2px;
+  border-radius: 24px;
   background: linear-gradient(
     60deg, 
     #ff0055, 
@@ -86,43 +78,51 @@ body {
     #ff0055
   );
   background-size: 300% 300%;
-  animation: rgbGlow 3.5s ease infinite;
+  animation: rgbGlow 4s linear infinite;
   z-index: -1;
-  filter: blur(10px);
-  opacity: 0.6;
+  filter: blur(12px);
+  opacity: 0.5;
 }
 
 .main-card {
   background: var(--card-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 18px;
-  padding: 20px 14px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 18px 12px;
   text-align: center;
   position: relative;
   z-index: 1;
 }
 
+/* HEADER & TITLE */
 .glow-title {
   margin-top: 0;
-  margin-bottom: 16px;
-  font-size: 1.5rem;
+  margin-bottom: 4px;
+  font-size: 1.45rem;
   font-weight: 800;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
   color: #fff;
   text-transform: uppercase;
-  text-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+  text-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
 }
 
-.symbols { color: var(--danger-color); }
-
-/* Section Layout */
-.section {
+.symbols {
+  font-size: 0.9rem;
   margin-bottom: 14px;
-  background: rgba(255, 255, 255, 0.025);
-  padding: 14px 12px;
+  letter-spacing: 4px;
+  color: var(--danger-color);
+  opacity: 0.9;
+}
+
+/* SECTION GLASS BOXES */
+.section {
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px;
   border-radius: 14px;
   border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .section-header {
@@ -133,26 +133,21 @@ body {
 }
 
 h2 {
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 800;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.8px;
   margin: 0;
 }
 
-/* Action Buttons */
-.btn-actions {
-  display: flex;
-  gap: 6px;
-}
-
+/* ACTION BUTTONS */
 .btn-clear {
   background: rgba(255, 42, 95, 0.12);
-  border: 1px solid rgba(255, 42, 95, 0.35);
+  border: 1px solid rgba(255, 42, 95, 0.4);
   color: #ff4d7d;
-  padding: 4px 10px;
-  font-size: 0.75rem;
+  padding: 4px 12px;
+  font-size: 0.72rem;
   font-weight: 700;
   border-radius: 20px;
   cursor: pointer;
@@ -162,76 +157,76 @@ h2 {
 .btn-clear:hover {
   background: var(--danger-color);
   color: #fff;
-  box-shadow: 0 0 10px rgba(255, 42, 95, 0.4);
+  box-shadow: 0 0 12px rgba(255, 42, 95, 0.5);
 }
 
-/* Card Elements */
+/* DESIGN KARTU REVOLUSIONER */
 .card-group {
   display: flex;
   justify-content: center;
   gap: 8px;
   flex-wrap: nowrap;
-  min-height: 85px;
-  margin-bottom: 4px;
+  min-height: 82px;
+  margin-bottom: 6px;
 }
 
 .card {
   position: relative;
-  width: 56px;
-  height: 80px;
+  width: 54px;
+  height: 78px;
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 6px;
+  padding: 5px;
   font-weight: 800;
-  font-size: 1.15rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  user-select: none;
+  font-size: 1.1rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
   box-sizing: border-box;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .card.filled {
   background: #ffffff;
+  border: 1px solid #e2e8f0;
   cursor: pointer;
 }
 
 .card.filled:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0, 240, 255, 0.4);
+  transform: translateY(-4px) scale(1.03);
+  box-shadow: 0 8px 20px rgba(0, 240, 255, 0.4);
 }
 
 .card.placeholder {
-  background: rgba(255, 255, 255, 0.03);
-  border: 2px dashed rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.025);
+  border: 2px dashed rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.2);
   justify-content: center;
   align-items: center;
   cursor: pointer;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
 }
 
 .card.placeholder:hover {
   border-color: var(--accent-color);
   color: var(--accent-color);
-  background: rgba(0, 240, 255, 0.06);
+  background: rgba(0, 240, 255, 0.05);
 }
 
 .card.red { color: #e11d48; }
 .card.black { color: #0f172a; }
 
-/* Status Box & Win Equity */
+/* STATUS BOX & METRICS */
 .status-box {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.35);
   padding: 10px 12px;
-  border-radius: 10px;
-  font-size: 0.85rem;
+  border-radius: 12px;
+  font-size: 0.82rem;
   color: #e2e8f0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .strength-meter-inline {
@@ -243,33 +238,35 @@ h2 {
 }
 
 .progress-bar-bg {
-  width: 140px;
+  width: 130px;
   height: 8px;
-  background: #1e293b;
+  background: #121929;
   border-radius: 10px;
   overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .progress-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--danger-color), var(--warning-color), var(--success-color));
-  transition: width 0.4s ease-out;
+  transition: width 0.4s ease;
   border-radius: 10px;
 }
 
 .percent-text {
-  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
   color: var(--accent-color);
 }
 
 .highlight-cyan { color: var(--accent-color); font-weight: 700; }
 .highlight-green { color: var(--success-color); font-weight: 700; }
 
-/* ACCORDION HAND RANGE MATRIX (BISA DIBUKA/DITUTUP) */
+/* ACCORDION RANGE LAWAN ELEGAN */
 .range-accordion {
   margin-top: 10px;
   border: 1px solid rgba(0, 240, 255, 0.2);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(0, 0, 0, 0.3);
   overflow: hidden;
 }
@@ -277,10 +274,10 @@ h2 {
 .accordion-btn {
   width: 100%;
   padding: 10px 12px;
-  background: rgba(0, 240, 255, 0.05);
+  background: rgba(0, 240, 255, 0.06);
   border: none;
   color: var(--accent-color);
-  font-size: 0.83rem;
+  font-size: 0.82rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -298,15 +295,13 @@ h2 {
   color: #fff;
 }
 
-.arrow-icon.active {
-  transform: rotate(180deg);
-}
+.arrow-icon.active { transform: rotate(180deg); }
 
 .accordion-content {
   padding: 10px;
   max-height: 500px;
   opacity: 1;
-  transition: all 0.3s ease-in-out;
+  transition: all 0.3s cubic-bezier(0, 1, 0, 1);
   overflow: hidden;
 }
 
@@ -325,11 +320,11 @@ h2 {
 }
 
 .range-item {
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.75);
   padding: 8px 10px;
   border-radius: 8px;
   border-left: 3px solid var(--accent-color);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .range-item.HIGH { border-left-color: var(--danger-color); }
@@ -349,18 +344,11 @@ h2 {
   line-height: 1.35;
 }
 
-/* Style Khusus Kartu Strategi */
+/* STRATEGY CARD HIGHLIGHT */
 .strategy-card {
-  border: 1px solid rgba(0, 240, 255, 0.25) !important;
-  background: rgba(0, 240, 255, 0.02) !important;
+  border: 1px solid rgba(0, 240, 255, 0.3) !important;
+  background: rgba(0, 240, 255, 0.025) !important;
   text-align: left;
-}
-
-.strategy-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 6px;
 }
 
 .strategy-action-container {
@@ -369,30 +357,24 @@ h2 {
   align-items: center;
 }
 
-.strategy-label {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
 .action-badge {
   font-weight: 800;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   padding: 6px 14px;
   border-radius: 10px;
   background: rgba(0, 240, 255, 0.1);
   color: var(--accent-color);
   border: 1.5px solid var(--accent-color);
   letter-spacing: 0.5px;
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
 }
 
 .strategy-reason {
-  font-size: 0.83rem;
+  font-size: 0.82rem;
   color: #cbd5e1;
-  margin: 0;
+  margin-top: 8px;
   line-height: 1.5;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.35);
   padding: 10px;
   border-radius: 8px;
   border-left: 3px solid var(--accent-color);
@@ -403,52 +385,34 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: rgba(0, 255, 135, 0.12);
-  border: 1px solid rgba(0, 255, 135, 0.4);
+  background: rgba(0, 255, 135, 0.1);
+  border: 1px solid rgba(0, 255, 135, 0.35);
   color: var(--success-color);
   padding: 8px 12px;
   border-radius: 10px;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   margin-top: 10px;
-  box-shadow: 0 0 12px rgba(0, 255, 135, 0.15);
-  animation: fadeIn 0.3s ease-in-out;
 }
 
-.combo-green-badge .badge-icon {
-  font-size: 1rem;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Section Result & Analysis */
+/* RESULT & ANALYSIS BOX */
 .result-box {
   margin-top: 12px;
-  padding: 14px;
+  padding: 12px;
   background: rgba(0, 0, 0, 0.35);
   border-radius: 14px;
   border: 1px solid var(--glass-border);
-}
-
-.potential-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
 }
 
 .potential-item {
   background: rgba(255, 42, 95, 0.08);
   border-left: 4px solid var(--danger-color);
   border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 0.85rem;
+  padding: 8px 10px;
+  font-size: 0.82rem;
   color: #ffa0b4;
   text-align: left;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .potential-item.safe {
@@ -461,23 +425,23 @@ h2 {
   border: 0;
   height: 1px;
   background: rgba(255, 255, 255, 0.08);
-  margin: 14px 0;
+  margin: 12px 0;
 }
 
 .glow-text {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 800;
   color: var(--success-color);
   text-shadow: 0 0 10px rgba(0, 255, 135, 0.4);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-/* Modal Picker Layout */
+/* MODAL CARD PICKER */
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(7, 10, 18, 0.85);
-  backdrop-filter: blur(12px);
+  background: rgba(6, 9, 17, 0.88);
+  backdrop-filter: blur(14px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -487,25 +451,24 @@ h2 {
 .modal.hidden { display: none; }
 
 .modal-content {
-  background: #0f1524;
-  border: 1px solid rgba(0, 240, 255, 0.4);
-  padding: 18px;
-  border-radius: 16px;
-  max-width: 640px;
+  background: #0d1321;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  padding: 16px;
+  border-radius: 18px;
+  max-width: 580px;
   width: 95%;
-  box-shadow: 0 12px 32px rgba(0, 240, 255, 0.15);
-  box-sizing: border-box;
+  box-shadow: 0 15px 35px rgba(0, 240, 255, 0.15);
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .close-btn {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   cursor: pointer;
   color: var(--danger-color);
 }
@@ -513,7 +476,7 @@ h2 {
 .full-card-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .suit-row {
@@ -521,12 +484,12 @@ h2 {
   align-items: center;
   gap: 4px;
   background: rgba(255, 255, 255, 0.02);
-  padding: 4px 6px;
+  padding: 4px;
   border-radius: 8px;
 }
 
 .suit-label {
-  width: 24px;
+  width: 22px;
   font-size: 1.1rem;
   font-weight: 800;
   text-align: center;
@@ -537,13 +500,13 @@ h2 {
 
 .btn-card-select {
   flex: 1;
-  min-width: 28px;
-  padding: 8px 0;
-  background: #1e293b;
+  min-width: 26px;
+  padding: 7px 0;
+  background: #1a2333;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -558,7 +521,7 @@ h2 {
 }
 
 .btn-card-select.disabled {
-  opacity: 0.2;
+  opacity: 0.15;
   cursor: not-allowed;
-  background: #090d16;
+  background: #080c14;
 }
