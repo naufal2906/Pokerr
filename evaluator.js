@@ -1,7 +1,7 @@
 import { RANKS, SUITS } from './card.js';
 
 export class PokerEvaluator {
-  // HELPER UNIVERSAL MENGAMBIL VALUE & SUIT DARI KARTU APA PUN
+  // HELPER UNIVERSAL MENGAMBIL VALUE & SUIT KARTU
   static getCardValue(card) {
     if (!card) return 0;
     if (typeof card.value === 'number') return card.value;
@@ -56,7 +56,7 @@ export class PokerEvaluator {
     return `${txt1} ${txt2} (${type})`;
   }
 
-  // 2. DETEKSI DRAW UNIVERSAL (MENDETEKSI STRAIGHT & FLUSH DRAW APA PUN)
+  // 2. DETEKSI DRAW UNIVERSAL
   static detectDraws(holeCards, communityCards) {
     const validHole = this.getValidCards(holeCards);
     const validComm = this.getValidCards(communityCards);
@@ -64,11 +64,11 @@ export class PokerEvaluator {
     if (all.length < 4) return [];
 
     const myBest = this.getBestHand(all);
-    if (myBest && myBest.score >= 5) return []; // Sudah Straight/Flush ke atas
+    if (myBest && myBest.score >= 5) return [];
 
     const draws = [];
     
-    // Deteksi Flush Draw Dinamis (4 kartu kembang sama apa saja)
+    // Flush Draw
     const suitCounts = {};
     all.forEach(c => {
       const s = this.getCardSuitSymbol(c);
@@ -80,9 +80,9 @@ export class PokerEvaluator {
       }
     });
 
-    // Deteksi Straight Draw Dinamis
+    // Straight Draw
     const values = [...new Set(all.map(c => this.getCardValue(c)))].sort((a, b) => a - b);
-    if (values.includes(14)) values.unshift(1); // Ace Low support (A-2-3-4-5)
+    if (values.includes(14)) values.unshift(1);
 
     for (let target = 2; target <= 14; target++) {
       if (!values.includes(target)) {
@@ -106,71 +106,80 @@ export class PokerEvaluator {
     return [...new Set(draws)];
   }
 
-  // 3. KALKULASI PROYEKSI OUTS & ODDS KARTU TANGAN (UNIVERSAL 52 KARTU)
+  // 3. KALKULASI PROYEKSI OUTS & ODDS KARTU TANGAN & MEJA (UNIVERSAL 52 KARTU)
   static calculateHandImprovementOdds(holeCards, communityCards) {
     const validHole = this.getValidCards(holeCards);
     const validComm = this.getValidCards(communityCards);
 
-    if (validHole.length < 2) return { text: "Pilih 2 Kartu Tangan", percent: 0 };
+    if (validHole.length < 2) return { text: "Pilih 2 Kartu Tangan", percent: 0, neededCards: "-" };
     if (validComm.length < 3) {
       const v1 = this.getCardValue(validHole[0]);
       const v2 = this.getCardValue(validHole[1]);
-      if (v1 === v2) return { text: "Pocket Pair (Peluang Set di Flop ~12%)", percent: 12 };
-      return { text: "Pre-Flop (Peluang Pair di Flop ~32%)", percent: 32 };
+      if (v1 === v2) return { text: "Pocket Pair (Peluang Set di Flop ~12%)", percent: 12, neededCards: "Set di Flop" };
+      return { text: "Pre-Flop (Peluang Pair di Flop ~32%)", percent: 32, neededCards: "Pair di Flop" };
     }
 
     const allCards = [...validHole, ...validComm];
     const myBest = this.getBestHand(allCards);
-    const remainingToOpen = 5 - validComm.length; // Flop = 2 kartu sisa, Turn = 1 kartu sisa
+    const remainingToOpen = 5 - validComm.length; // Flop = 2, Turn = 1, River = 0
 
     if (remainingToOpen === 0) {
-      return { text: `Kombinasi Final: ${myBest.rankName}`, percent: 100 };
+      return { text: `Kombinasi Final: ${myBest.rankName}`, percent: 100, neededCards: "Kombinasi Maksimal" };
     }
 
-    const multiplier = remainingToOpen === 2 ? 4 : 2; // Aturan x4 di Flop, x2 di Turn
+    const multiplier = remainingToOpen === 2 ? 4 : 2;
 
-    // 1. Three of a Kind (Set) -> Mengincar Full House / Quads
+    const commRanks = validComm.map(c => this.getCardValue(c));
+    const commLabels = [...new Set(commRanks.map(r => this.getCardLabel({value: r})))];
+
+    // Case 1: Three of a Kind (Set) -> Mengincar Full House / Quads (Ancaman Terkuat)
     if (myBest.score === 4) {
       const outs = 7; // 3 kartu pair 1 + 3 kartu pair 2 + 1 kartu set tersisa
+      const neededText = `Butuh kartu [ ${commLabels.join(', ')} ] untuk Full House atau 1 kartu Set tersisa untuk Quads`;
       return {
-        text: `🔥 PROYEKSI: Full House / Quads Draw (${outs} Outs)`,
-        percent: Math.min(100, outs * multiplier)
+        text: `🔥 PROYEKSI TERTIMGI: Full House / Quads Draw (${outs} Outs)`,
+        percent: Math.min(100, outs * multiplier),
+        neededCards: neededText
       };
     }
 
-    // 2. Two Pair -> Mengincar Full House
+    // Case 2: Two Pair -> Mengincar Full House
     if (myBest.score === 3) {
-      const outs = 4; // 2 kartu pair 1 + 2 kartu pair 2
+      const outs = 4;
+      const neededText = `Butuh 1 kartu [ ${commLabels.slice(0, 2).join(' atau ')} ] lagi untuk Full House`;
       return {
-        text: `🏠 PROYEKSI: Full House Draw (${outs} Outs)`,
-        percent: outs * multiplier
+        text: `🏠 PROYEKSI TERTIMGI: Full House Draw (${outs} Outs)`,
+        percent: outs * multiplier,
+        neededCards: neededText
       };
     }
 
-    // 3. One Pair -> Mengincar Set / Two Pair
+    // Case 3: One Pair -> Mengincar Set / Two Pair
     if (myBest.score === 2) {
       const outs = 5;
       return {
         text: `⚡ PROYEKSI: Set / Two Pair Draw (${outs} Outs)`,
-        percent: outs * multiplier
+        percent: outs * multiplier,
+        neededCards: "Butuh kartu yang cocok dengan tangan/meja"
       };
     }
 
-    // 4. Drawing Hands (Flush Draw / Straight Draw)
+    // Case 4: Drawing Hands (Flush Draw / Straight Draw)
     const draws = this.detectDraws(validHole, validComm);
     if (draws.length > 0) {
       const isFlushDraw = draws.some(d => d.includes("Flush"));
       const outs = isFlushDraw ? 9 : 8;
       return {
         text: isFlushDraw ? "🌊 PROYEKSI: Flush Draw (9 Outs)" : "🎯 PROYEKSI: Straight Draw (8 Outs)",
-        percent: outs * multiplier
+        percent: outs * multiplier,
+        neededCards: isFlushDraw ? "Butuh 1 kartu kembang sama lagi" : "Butuh 1 kartu angka urutan"
       };
     }
 
-    return { text: "High Card (Butuh Kartu Cocok di Board)", percent: 15 };
+    return { text: "High Card (Belum Ada Kombinasi Jadi)", percent: 15, neededCards: "Butuh kartu cocok di Turn/River" };
   }
 
-  // 4. PEMETAN 7 RANGE LAWAN UNIVERSAL
+  // 4. PEMETAN 7 RANGE LAWAN UNIVERSAL (LABEL DIRECT STRAIGHT FLUSH)
   static getPossibleHandRanges(communityCards, holeCards = []) {
     const comm = this.getValidCards(communityCards);
     if (comm.length < 3) return [];
@@ -178,19 +187,16 @@ export class PokerEvaluator {
     const commRanks = comm.map(c => this.getCardValue(c)).sort((a, b) => b - a);
     const commSuits = comm.map(c => this.getCardSuitSymbol(c));
 
-    // Analisis Kembang Murni (Dinamis)
     const suitCounts = {};
     commSuits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
     const maxSuitCount = Math.max(...Object.values(suitCounts));
     const dominantSuit = Object.keys(suitCounts).find(s => suitCounts[s] === maxSuitCount) || '♦';
 
-    // Analisis Angka & Pair di Board
     const rankCounts = {};
     commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
     const topRank = commRanks[0];
     const topLabel = this.getCardLabel(comm.find(c => this.getCardValue(c) === topRank));
 
-    // Analisis Celah Straight Dinamis
     const uniqueRanks = [...new Set(commRanks)].sort((a, b) => a - b);
     if (uniqueRanks.includes(14)) uniqueRanks.unshift(1);
     
@@ -207,21 +213,21 @@ export class PokerEvaluator {
       }
     }
 
-    const straightCardsText = neededForStraight.length > 0 ? neededForStraight.slice(0, 3).join(', ') : '9, 8';
+    const straightCardsText = neededForStraight.length > 0 ? neededForStraight.slice(0, 3).join(', ') : '2, 3, 6';
 
     return [
       {
-        category: "1. 👑 Straight / Royal Flush Potential",
+        category: "1. 👑 Straight Flush Potential",
         hands: maxSuitCount >= 3 
           ? [`Lawan pegang 2 kartu kembang ${dominantSuit} urutan (${straightCardsText}${dominantSuit})`]
           : maxSuitCount === 2
-            ? [`Lawan pegang 2 kartu kembang ${dominantSuit} (Backdoor Draw)`]
-            : [`Butuh 2 kartu kembang sama + urutan`],
+            ? [`Lawan pegang 2 kartu kembang ${dominantSuit} urutan (Backdoor Draw)`]
+            : [`Butuh 2 kartu kembang sama di Turn & River`],
         type: "Suited",
         danger: maxSuitCount >= 3 ? "HIGH" : "MEDIUM"
       },
       {
-        category: "2. 🎯 Straight / Urutan Angka",
+        category: "2. 🎯 Straight (Urutan Angka)",
         hands: [`Lawan memegang kartu angka spesifik: [ ${straightCardsText} ]`],
         type: "Suited & Offsuit",
         danger: "HIGH"
