@@ -12,6 +12,21 @@ body {
   display: flex;
   justify-content: center;
   min-height: 100vh;
+  transition: background 0.2s ease;
+}
+
+/* MODE KACAMATA TEMBUS PANDANG (SMART GLASS HUD) */
+body.glass-mode {
+  background: rgba(5, 8, 15, 0.42) !important;
+}
+
+body.glass-mode .hud-panel,
+body.glass-mode .card-group,
+body.glass-mode .picker-panel,
+body.glass-mode .scanner-panel {
+  background: rgba(10, 15, 28, 0.62) !important;
+  backdrop-filter: blur(6px);
+  border-color: rgba(0, 240, 255, 0.45);
 }
 
 .app-container {
@@ -33,38 +48,58 @@ body {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .app-title {
   font-weight: 900;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   color: #00f0ff;
-  letter-spacing: 0.5px;
 }
 
 .blind-badge {
   background: #1e293b;
   color: #94a3b8;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
 }
 
-.header-actions {
-  display: flex;
-  gap: 6px;
+.blind-badge.live {
+  background: rgba(16, 185, 129, 0.25);
+  color: #34d399;
 }
 
-.btn-pip {
-  background: linear-gradient(90deg, #0284c7, #00f0ff);
+.header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-glass {
+  background: rgba(30, 41, 59, 0.85);
+  color: #00f0ff;
+  border: 1px solid #00f0ff;
+  border-radius: 6px;
+  padding: 5px 7px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-glass.active {
+  background: #00f0ff;
+  color: #020617;
+}
+
+.btn-scan {
+  background: linear-gradient(90deg, #10b981, #00f0ff);
   color: #020617;
   border: none;
   border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 800;
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  font-weight: 900;
   cursor: pointer;
 }
 
@@ -73,10 +108,89 @@ body {
   color: #f8fafc;
   border: none;
   border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
+  padding: 5px 8px;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.scanner-panel {
+  background: #0b1221;
+  border: 1px solid #10b981;
+  border-radius: 10px;
+  padding: 6px 8px;
+}
+
+.scanner-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.scanner-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #34d399;
+}
+
+.scanner-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-mini {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-mini.danger {
+  border-color: #ef4444;
+  color: #f87171;
+}
+
+.preview-wrapper {
+  display: flex;
+  justify-content: center;
+  background: #020617;
+  border-radius: 6px;
+  overflow: hidden;
+  max-height: 150px;
+}
+
+#scan-preview-canvas {
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+}
+
+.calib-controls {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calib-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: #cbd5e1;
+}
+
+.calib-row input[type="range"] {
+  width: 55%;
 }
 
 .hud-panel {
@@ -102,7 +216,7 @@ body {
 }
 
 .muted-text {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   color: #64748b;
 }
 
@@ -129,7 +243,6 @@ body {
   display: grid;
   grid-template-columns: 1fr 1.85fr;
   gap: 6px;
-  margin: 5px 0;
 }
 
 .card-group {
@@ -165,7 +278,7 @@ body {
 
 .card-slot {
   flex: 1;
-  height: 42px;
+  height: 40px;
   background: #1e293b;
   border: 1.5px dashed #475569;
   border-radius: 6px;
@@ -173,7 +286,7 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: 900;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: #64748b;
   cursor: pointer;
   user-select: none;
@@ -286,13 +399,13 @@ body {
 }
 
 .verdict-title {
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 900;
   letter-spacing: 0.4px;
 }
 
 .verdict-sub {
-  font-size: 0.72rem;
+  font-size: 0.71rem;
   margin-top: 2px;
   opacity: 0.95;
 }
@@ -360,10 +473,10 @@ body {
   background: #1e293b;
   border: 1px solid #334155;
   color: #f8fafc;
-  height: 34px;
+  height: 33px;
   border-radius: 6px;
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   cursor: pointer;
 }
 
