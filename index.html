@@ -3,125 +3,112 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Poker Evaluator Pro</title>
+  <title>Poker Evaluator Pro HUD</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="header-left">
+        <span class="app-title">♠ POKER HUD PRO</span>
+        <span class="blind-badge">Blind 300/600</span>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="btn-pip-mode" class="btn-pip">📺 PiP</button>
+        <button type="button" id="btn-reset" class="btn-reset">Reset</button>
+      </div>
+    </header>
 
-  <div class="rgb-card-container">
-    <div class="main-card">
-      
-      <!-- HEADER -->
-      <h1 class="glow-title">POKER EVALUATOR</h1>
-      <div class="symbols">♠ ♥ ♣ ♦</div>
+    <!-- AREA HUD UTAMA (BISA DIPINDAHKAN KE JENDELA MENGAMBANG PiP) -->
+    <div id="hud-pip-container">
+      <!-- HUD ATAS: OUTS SISA KARTU DI LUAR MEJA -->
+      <div id="hud-outs-bar" class="hud-panel">
+        <div class="hud-label">OUTS SISA KARTU (Tap kartu jika sudah keluar):</div>
+        <div id="hud-outs-chips" class="hud-card-list">
+          <span class="muted-text">Pilih 2 kartu tangan dulu</span>
+        </div>
+      </div>
 
-      <!-- SECTION 1: KARTU TANGAN & REAL-TIME ODDS -->
-      <div class="section">
-        <div class="section-header">
-          <h2>Kartu Tangan Anda (Hole Cards)</h2>
-          <div class="btn-actions">
-            <button id="btn-clear-hand" class="btn-clear">Reset</button>
+      <!-- AREA KARTU TANGAN & KARTU KOMUNITAS MEJA -->
+      <div class="table-section">
+        <div class="card-group">
+          <div class="group-header">
+            <span>KARTU KITA (HERO)</span>
+            <span id="current-hand-badge" class="combo-badge">-</span>
+          </div>
+          <div class="slots-row" id="hole-slots">
+            <div class="card-slot active-slot" data-type="hole" data-index="0">?</div>
+            <div class="card-slot" data-type="hole" data-index="1">?</div>
           </div>
         </div>
-        
-        <div id="hand-cards" class="card-group"></div>
 
-        <div class="status-box">
-          <div>Kombinasi Kartu Tangan: <span id="hole-only-hand" class="highlight-cyan">-</span></div>
-          <div>Kombinasi Tangan + Meja: <span id="my-best-hand" class="highlight-green">-</span></div>
-          
-          <div class="strength-meter-inline">
-            <span>Win Equity / Odds:</span>
-            <div class="progress-bar-bg">
-              <div id="strength-bar" class="progress-bar-fill"></div>
-            </div>
-            <span id="strength-percent" class="percent-text">0%</span>
+        <div class="card-group">
+          <div class="group-header">
+            <span>KARTU MEJA (KOMUNITAS)</span>
+            <span id="stage-badge" class="stage-badge">PRE-FLOP</span>
+          </div>
+          <div class="slots-row" id="comm-slots">
+            <div class="card-slot" data-type="comm" data-index="0">F1</div>
+            <div class="card-slot" data-type="comm" data-index="1">F2</div>
+            <div class="card-slot" data-type="comm" data-index="2">F3</div>
+            <div class="card-slot" data-type="comm" data-index="3">T</div>
+            <div class="card-slot" data-type="comm" data-index="4">R</div>
           </div>
         </div>
       </div>
 
-      <!-- SECTION 2: KARTU KOMUNITAS & RANGE MATRIX -->
-      <div class="section">
-        <div class="section-header">
-          <h2>Kartu Komunitas (Board)</h2>
-          <div class="btn-actions">
-            <button id="btn-clear-comm" class="btn-clear">Reset</button>
-          </div>
+      <!-- HUD BAWAH: PERSENTASE MEJA, TARGET KITA & KEPUTUSAN POT ODDS -->
+      <div id="hud-combo-bar" class="hud-panel">
+        <div class="hud-row">
+          <span class="hud-tag tag-board">MEJA:</span>
+          <span id="hud-board-pct" class="hud-val">Belum Ada Kartu Meja</span>
         </div>
-        
-        <div id="community-cards" class="card-group"></div>
+        <div class="hud-row">
+          <span class="hud-tag tag-hero">KITA:</span>
+          <span id="hud-hero-target" class="hud-val highlight">Pilih 2 Kartu Tangan</span>
+        </div>
 
-        <!-- ACCORDION HAND RANGE MATRIX (7 KOMBINASI LAWAN) -->
-        <div class="range-accordion">
-          <button type="button" id="toggleRangeBtn" class="accordion-btn">
-            <span>🎯 <b>Range Kartu Lawan (Hand Range Matrix)</b></span>
-            <span id="rangeArrow" class="arrow-icon">▼</span>
-          </button>
-          <div id="rangeContent" class="accordion-content hidden">
-            <div id="handRangeContainer" class="range-matrix-grid">
-              <!-- Render 7 Range Kartu Spesifik lewat JS -->
+        <!-- KALKULATOR CEPAT POT & BET LAWAN -->
+        <div class="pot-odds-box">
+          <div class="pot-inputs">
+            <div class="input-mini">
+              <label for="input-pot">Total Pot</label>
+              <input type="number" id="input-pot" value="1800" step="300" min="0">
+            </div>
+            <div class="input-mini">
+              <label for="input-bet">Bet / Raise Lawan</label>
+              <input type="number" id="input-bet" value="600" step="300" min="0">
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- SECTION 3: STRATEGI BETTING & KALKULASI NOMINAL CHIPS (BLIND 300/600) -->
-      <div class="section strategy-card">
-        <h2>Saran Strategi & Nominal Betting (Blind 300/600)</h2>
-
-        <div class="strategy-body">
-          <div class="strategy-action-container">
-            <span class="strategy-label">Rekomendasi Aksi:</span>
-            <span id="strat-action" class="action-badge">WAIT</span>
+          <div class="quick-bet-btns">
+            <button type="button" class="qbet" data-bet="0">Check (0)</button>
+            <button type="button" class="qbet" data-bet="600">600</button>
+            <button type="button" class="qbet" data-bet="1800">1.8k</button>
+            <button type="button" class="qbet" data-bet="6000">6k</button>
+            <button type="button" class="qbet" data-bet="15000">All-In</button>
           </div>
 
-          <!-- REKOMENDASI NOMINAL CHIPS (+EV) -->
-          <div style="display: flex; flex-direction: column; gap: 8px; margin: 10px 0; background: rgba(0,0,0,0.35); padding: 12px; border-radius: 10px; border: 1px solid rgba(0, 240, 255, 0.15);">
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
-              <span style="color: var(--text-muted); font-weight: 600;">Batas Maksimal Call (+EV):</span>
-              <span id="max-call-prob" style="color: var(--accent-color); font-weight: 800; font-size: 0.95rem;">0 Chips</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
-              <span style="color: var(--text-muted); font-weight: 600;">Estimasi Raise/Bet Ideal:</span>
-              <span id="strat-amount" style="color: var(--warning-color); font-weight: 800; font-size: 0.95rem;">0 Chips</span>
-            </div>
+          <div id="decision-banner" class="decision-banner verdict-call">
+            <div id="decision-verdict" class="verdict-title">MENUNGGU KARTU</div>
+            <div id="decision-detail" class="verdict-sub">Pilih 2 kartu tangan untuk mulai menghitung.</div>
           </div>
-
-          <p id="strat-reason" class="strategy-reason">
-            Pilih 2 Kartu Tangan Terlebih Dahulu.
-          </p>
         </div>
       </div>
+    </div>
 
-      <!-- SECTION 4: ANALISIS THREATS & BEST HAND -->
-      <div class="result-box">
-        <h2 style="margin-bottom: 10px; text-align: left;">Analisis Potensi & Counter Kartu Terkuat (The Nuts):</h2>
-        <div id="board-threats" class="potential-list"></div>
-
-        <hr class="divider">
-
-        <p style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 6px; text-align: left;">Kombinasi Final Terbaik saat Ini:</p>
-        <div id="result-name" class="glow-text">-</div>
-        <div id="best-cards" class="card-group"></div>
+    <!-- KEYPAD PEMILIH KARTU CEPAT (1 LAYAR HP) -->
+    <div class="picker-panel">
+      <div class="suit-tabs" id="suit-tabs">
+        <button type="button" class="suit-btn active" data-suit="♠">♠ Sekop</button>
+        <button type="button" class="suit-btn red" data-suit="♥">♥ Hati</button>
+        <button type="button" class="suit-btn" data-suit="♣">♣ Keriting</button>
+        <button type="button" class="suit-btn red" data-suit="♦">♦ Wajik</button>
       </div>
-
+      <div class="rank-grid" id="rank-grid"></div>
     </div>
   </div>
 
-  <!-- MODAL PICKER KARTU -->
-  <div id="card-picker-modal" class="modal hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 style="margin:0; font-size:1.05rem; color: var(--accent-color);">Pilih Kartu (<span id="target-label">Slot</span>)</h3>
-        <span id="close-modal" class="close-btn">&times;</span>
-      </div>
-      <div id="full-card-grid" class="full-card-grid"></div>
-    </div>
-  </div>
-
-  <script type="module" src="app.js"></script>
+  <script src="evaluator.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
