@@ -1,483 +1,445 @@
-import { RANKS, SUITS } from './card.js';
+class PokerEvaluator {
+  static RANKS = [
+    { value: 14, label: 'A' }, { value: 13, label: 'K' }, { value: 12, label: 'Q' },
+    { value: 11, label: 'J' }, { value: 10, label: '10' }, { value: 9, label: '9' },
+    { value: 8, label: '8' }, { value: 7, label: '7' }, { value: 6, label: '6' },
+    { value: 5, label: '5' }, { value: 4, label: '4' }, { value: 3, label: '3' },
+    { value: 2, label: '2' }
+  ];
 
-export class PokerEvaluator {
-  // HELPER UNIVERSAL MENGAMBIL VALUE & SUIT KARTU
-  static getCardValue(card) {
-    if (!card) return 0;
-    if (typeof card.value === 'number') return card.value;
-    if (card.rank && typeof card.rank.value === 'number') return card.rank.value;
-    return 0;
-  }
-
-  static getCardLabel(card) {
-    if (!card) return '';
-    if (card.rank && card.rank.label) return card.rank.label;
-    if (card.label) return card.label;
-    const v = this.getCardValue(card);
-    if (v > 0) {
-      return v === 14 ? 'A' : v === 13 ? 'K' : v === 12 ? 'Q' : v === 11 ? 'J' : String(v);
-    }
-    return '';
-  }
-
-  static getCardSuitSymbol(card) {
-    if (!card) return '';
-    if (card.suit && card.suit.symbol) return card.suit.symbol;
-    if (typeof card.suit === 'string') return card.suit;
-    if (card.symbol) return card.symbol;
-    return '';
-  }
+  static SUITS = ['♠', '♥', '♣', '♦'];
 
   static getValidCards(cards) {
-    return (cards || []).filter(c => c && (this.getCardValue(c) > 0));
+    return (cards || []).filter(c => c && c.label && c.suit);
   }
 
   static formatCardText(card) {
-    if (!card) return '';
-    return `${this.getCardLabel(card)}${this.getCardSuitSymbol(card)}`;
+    return `${card.label}${card.suit}`;
   }
 
-  // 1. EVALUASI KARTU TANGAN MURNI (PRE-FLOP)
-  static evaluateHoleCardsOnly(holeCards) {
-    const valid = this.getValidCards(holeCards);
-    if (valid.length < 2) return "Pilih 2 Kartu Tangan";
-
-    const txt1 = this.formatCardText(valid[0]);
-    const txt2 = this.formatCardText(valid[1]);
-    const v1 = this.getCardValue(valid[0]);
-    const v2 = this.getCardValue(valid[1]);
-
-    if (v1 === v2) return `Pocket Pair (${txt1} ${txt2})`;
-
-    const s1 = this.getCardSuitSymbol(valid[0]);
-    const s2 = this.getCardSuitSymbol(valid[1]);
-    const type = (s1 === s2) ? "Suited" : "Offsuit";
-
-    return `${txt1} ${txt2} (${type})`;
+  static getCardSuitSymbol(card) {
+    return card.suit;
   }
 
-  // 2. DETEKSI DRAW UNIVERSAL
-  static detectDraws(holeCards, communityCards) {
-    const validHole = this.getValidCards(holeCards);
-    const validComm = this.getValidCards(communityCards);
-    const all = [...validHole, ...validComm];
-    if (all.length < 4) return [];
-
-    const myBest = this.getBestHand(all);
-    if (myBest && myBest.score >= 5) return [];
-
-    const draws = [];
-    
-    // Flush Draw
-    const suitCounts = {};
-    all.forEach(c => {
-      const s = this.getCardSuitSymbol(c);
-      suitCounts[s] = (suitCounts[s] || 0) + 1;
-    });
-    Object.keys(suitCounts).forEach(s => {
-      if (suitCounts[s] === 4) {
-        draws.push(`🌊 <b>Flush Draw (${s})!</b> Butuh 1 kartu kembang ${s} lagi.`);
-      }
-    });
-
-    // Straight Draw
-    const values = [...new Set(all.map(c => this.getCardValue(c)))].sort((a, b) => a - b);
-    if (values.includes(14)) values.unshift(1);
-
-    for (let target = 2; target <= 14; target++) {
-      if (!values.includes(target)) {
-        const testSet = [...values, target].sort((a, b) => a - b);
-        let consecutive = 1;
-        for (let i = 0; i < testSet.length - 1; i++) {
-          if (testSet[i + 1] === testSet[i] + 1) {
-            consecutive++;
-            if (consecutive >= 5) {
-              const neededLabel = target === 14 ? 'A' : target === 13 ? 'K' : target === 12 ? 'Q' : target === 11 ? 'J' : target === 1 ? 'A' : target;
-              draws.push(`🎯 <b>Straight Draw!</b> Butuh kartu [${neededLabel}].`);
-              break;
-            }
-          } else if (testSet[i + 1] !== testSet[i]) {
-            consecutive = 1;
-          }
-        }
-      }
-    }
-
-    return [...new Set(draws)];
-  }
-
-  // 3. KALKULASI PROYEKSI OUTS & ODDS KARTU TANGAN & MEJA (UNIVERSAL 52 KARTU)
-  static calculateHandImprovementOdds(holeCards, communityCards) {
-    const validHole = this.getValidCards(holeCards);
-    const validComm = this.getValidCards(communityCards);
-
-    if (validHole.length < 2) return { text: "Pilih 2 Kartu Tangan", percent: 0, neededCards: "-" };
-    if (validComm.length < 3) {
-      const v1 = this.getCardValue(validHole[0]);
-      const v2 = this.getCardValue(validHole[1]);
-      if (v1 === v2) return { text: "Pocket Pair (Peluang Set di Flop ~12%)", percent: 12, neededCards: "Set di Flop" };
-      return { text: "Pre-Flop (Peluang Pair di Flop ~32%)", percent: 32, neededCards: "Pair di Flop" };
-    }
-
-    const allCards = [...validHole, ...validComm];
-    const myBest = this.getBestHand(allCards);
-    const remainingToOpen = 5 - validComm.length; // Flop = 2, Turn = 1, River = 0
-
-    if (remainingToOpen === 0) {
-      return { text: `Kombinasi Final: ${myBest.rankName}`, percent: 100, neededCards: "Kombinasi Maksimal" };
-    }
-
-    const multiplier = remainingToOpen === 2 ? 4 : 2;
-
-    const commRanks = validComm.map(c => this.getCardValue(c));
-    const commLabels = [...new Set(commRanks.map(r => this.getCardLabel({value: r})))];
-
-    // Case 1: Three of a Kind (Set) -> Mengincar Full House / Quads (Ancaman Terkuat)
-    if (myBest.score === 4) {
-      const outs = 7; // 3 kartu pair 1 + 3 kartu pair 2 + 1 kartu set tersisa
-      const neededText = `Butuh kartu [ ${commLabels.join(', ')} ] untuk Full House atau 1 kartu Set tersisa untuk Quads`;
-      return {
-        text: `🔥 PROYEKSI TERTIMGI: Full House / Quads Draw (${outs} Outs)`,
-        percent: Math.min(100, outs * multiplier),
-        neededCards: neededText
-      };
-    }
-
-    // Case 2: Two Pair -> Mengincar Full House
-    if (myBest.score === 3) {
-      const outs = 4;
-      const neededText = `Butuh 1 kartu [ ${commLabels.slice(0, 2).join(' atau ')} ] lagi untuk Full House`;
-      return {
-        text: `🏠 PROYEKSI TERTIMGI: Full House Draw (${outs} Outs)`,
-        percent: outs * multiplier,
-        neededCards: neededText
-      };
-    }
-
-    // Case 3: One Pair -> Mengincar Set / Two Pair
-    if (myBest.score === 2) {
-      const outs = 5;
-      return {
-        text: `⚡ PROYEKSI: Set / Two Pair Draw (${outs} Outs)`,
-        percent: outs * multiplier,
-        neededCards: "Butuh kartu yang cocok dengan tangan/meja"
-      };
-    }
-
-    // Case 4: Drawing Hands (Flush Draw / Straight Draw)
-    const draws = this.detectDraws(validHole, validComm);
-    if (draws.length > 0) {
-      const isFlushDraw = draws.some(d => d.includes("Flush"));
-      const outs = isFlushDraw ? 9 : 8;
-      return {
-        text: isFlushDraw ? "🌊 PROYEKSI: Flush Draw (9 Outs)" : "🎯 PROYEKSI: Straight Draw (8 Outs)",
-        percent: outs * multiplier,
-        neededCards: isFlushDraw ? "Butuh 1 kartu kembang sama lagi" : "Butuh 1 kartu angka urutan"
-      };
-    }
-
-    return { text: "High Card (Belum Ada Kombinasi Jadi)", percent: 15, neededCards: "Butuh kartu cocok di Turn/River" };
-  }
-
-  // 4. PEMETAN 7 RANGE LAWAN UNIVERSAL (LABEL DIRECT STRAIGHT FLUSH)
-  static getPossibleHandRanges(communityCards, holeCards = []) {
-    const comm = this.getValidCards(communityCards);
-    if (comm.length < 3) return [];
-
-    const commRanks = comm.map(c => this.getCardValue(c)).sort((a, b) => b - a);
-    const commSuits = comm.map(c => this.getCardSuitSymbol(c));
-
-    const suitCounts = {};
-    commSuits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
-    const maxSuitCount = Math.max(...Object.values(suitCounts));
-    const dominantSuit = Object.keys(suitCounts).find(s => suitCounts[s] === maxSuitCount) || '♦';
-
-    const rankCounts = {};
-    commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
-    const topRank = commRanks[0];
-    const topLabel = this.getCardLabel(comm.find(c => this.getCardValue(c) === topRank));
-
-    const uniqueRanks = [...new Set(commRanks)].sort((a, b) => a - b);
-    if (uniqueRanks.includes(14)) uniqueRanks.unshift(1);
-    
-    const neededForStraight = [];
-    for (let target = 2; target <= 14; target++) {
-      const windowRanks = uniqueRanks.filter(r => r >= target - 4 && r <= target);
-      if (windowRanks.length >= 2) {
-        for (let check = target - 4; check <= target; check++) {
-          if (check >= 1 && !uniqueRanks.includes(check)) {
-            const lbl = check === 1 || check === 14 ? 'A' : check === 13 ? 'K' : check === 12 ? 'Q' : check === 11 ? 'J' : String(check);
-            if (!neededForStraight.includes(lbl)) neededForStraight.push(lbl);
-          }
-        }
-      }
-    }
-
-    const straightCardsText = neededForStraight.length > 0 ? neededForStraight.slice(0, 3).join(', ') : '2, 3, 6';
-
-    return [
-      {
-        category: "1. 👑 Straight Flush Potential",
-        hands: maxSuitCount >= 3 
-          ? [`Lawan pegang 2 kartu kembang ${dominantSuit} urutan (${straightCardsText}${dominantSuit})`]
-          : maxSuitCount === 2
-            ? [`Lawan pegang 2 kartu kembang ${dominantSuit} urutan (Backdoor Draw)`]
-            : [`Butuh 2 kartu kembang sama di Turn & River`],
-        type: "Suited",
-        danger: maxSuitCount >= 3 ? "HIGH" : "MEDIUM"
-      },
-      {
-        category: "2. 🎯 Straight (Urutan Angka)",
-        hands: [`Lawan memegang kartu angka spesifik: [ ${straightCardsText} ]`],
-        type: "Suited & Offsuit",
-        danger: "HIGH"
-      },
-      {
-        category: "3. ⚡ Three of a Kind / Two Pair",
-        hands: [`Pocket Pair Set (${topLabel}${topLabel}) atau Hit 2 Pair [${topLabel} + Low]`],
-        type: "Pocket Pair / Connectors",
-        danger: "MEDIUM"
-      },
-      {
-        category: "4. 🌊 Flush Status",
-        hands: maxSuitCount >= 3 
-          ? [`SUDAH FLUSH: Lawan pegang 2 kartu kembang ${dominantSuit}`]
-          : maxSuitCount === 2 
-            ? [`FLUSH DRAW: Lawan pegang 2 kartu kembang ${dominantSuit}`]
-            : [`BACKDOOR FLUSH: Butuh 2 kartu ${dominantSuit} di Turn & River`],
-        type: "Suited",
-        danger: maxSuitCount >= 3 ? "HIGH" : "MEDIUM"
-      },
-      {
-        category: "5. 🏠 Full House Potential",
-        hands: Object.values(rankCounts).some(v => v >= 2)
-          ? [`Set / Pair kombinasi board (${commRanks.slice(0, 2).map(r => this.getCardLabel({value:r})).join('')})`]
-          : [`Set (${topLabel}${topLabel}) mengejar Full House`],
-        type: "Suited & Offsuit",
-        danger: Object.values(rankCounts).some(v => v >= 2) ? "HIGH" : "MEDIUM"
-      },
-      {
-        category: "6. 🚨 Four of a Kind (Quads)",
-        hands: Object.values(rankCounts).includes(3)
-          ? [`1 kartu [${topLabel}] tersisa di tangan lawan`]
-          : [`Pocket Pair matching board (${topLabel}${topLabel})`],
-        type: "Pocket Pair / Single",
-        danger: Object.values(rankCounts).some(v => v >= 2) ? "HIGH" : "MEDIUM"
-      },
-      {
-        category: "7. 🛡️ Overpair / Top Pair & Kicker",
-        hands: [`Overpair (AA-77) atau Top Pair [A${topLabel}, K${topLabel}]`],
-        type: "Suited & Offsuit",
-        danger: "MEDIUM"
-      }
-    ];
-  }
-
-  // 5. KALKULASI WIN EQUITY
-  static calculateStrength(holeCards, communityCards) {
-    const validHand = this.getValidCards(holeCards);
-    if (validHand.length < 2) return 0;
-
-    const validComm = this.getValidCards(communityCards);
-    const best = this.getBestHand([...validHand, ...validComm]);
-
-    if (validComm.length === 0) {
-      const v1 = this.getCardValue(validHand[0]);
-      const v2 = this.getCardValue(validHand[1]);
-      if (v1 === v2) return Math.min(90, Math.round(55 + v1 * 2.5));
-      return Math.min(70, Math.round(20 + Math.max(v1, v2) * 2.5));
-    }
-
-    const scoreMap = { 10: 100, 9: 99, 8: 98, 7: 92, 6: 88, 5: 80, 4: 65, 3: 55, 2: 40, 1: 20 };
-    let equity = scoreMap[best.score] || 20;
-
-    const draws = this.detectDraws(validHand, validComm);
-    if (draws.length > 0) equity = Math.min(92, equity + 12);
-
-    return Math.round(equity);
-  }
-
-  // 6. EVALUASI LENGKAP 5 KARTU TERBAIK
+  // Evaluasi 5 kartu terbaik dari maksimal 7 kartu (Aturan Baku Best 5-Card Hand)
   static getBestHand(cards) {
     const valid = this.getValidCards(cards);
-    if (valid.length === 0) return { score: 0, rankName: "-", cards: [] };
+    if (valid.length < 5) {
+      return this.evaluatePartial(valid);
+    }
 
-    const sorted = [...valid].sort((a, b) => this.getCardValue(b) - this.getCardValue(a));
-    const values = [...new Set(sorted.map(c => this.getCardValue(c)))].sort((a, b) => b - a);
+    const combos = this.getCombinations(valid, 5);
+    let best = { score: 0, rankName: 'High Card', tieBreaker: [] };
 
-    const suitGroups = {};
-    sorted.forEach(c => {
-      const s = this.getCardSuitSymbol(c);
-      suitGroups[s] = suitGroups[s] || [];
-      suitGroups[s].push(c);
-    });
-
-    let flushCards = null;
-    Object.keys(suitGroups).forEach(s => {
-      if (suitGroups[s].length >= 5) flushCards = suitGroups[s];
-    });
-
-    if (flushCards) {
-      const fValues = [...new Set(flushCards.map(c => this.getCardValue(c)))].sort((a, b) => b - a);
-      if (fValues.includes(14)) fValues.push(1);
-      
-      for (let i = 0; i <= fValues.length - 5; i++) {
-        if (fValues[i] - fValues[i + 4] === 4) {
-          if (fValues[i] === 14) {
-            return { score: 10, rankName: "Royal Flush", cards: flushCards.slice(0, 5) };
-          }
-          return { score: 9, rankName: "Straight Flush", cards: flushCards.slice(0, 5) };
-        }
+    for (const combo of combos) {
+      const res = this.evaluate5Cards(combo);
+      if (this.compareHands(res, best) > 0) {
+        best = res;
       }
+    }
+    return best;
+  }
+
+  static evaluatePartial(cards) {
+    if (cards.length === 0) return { score: 0, rankName: '-', tieBreaker: [] };
+    const counts = {};
+    cards.forEach(c => counts[c.value] = (counts[c.value] || 0) + 1);
+    const vals = Object.values(counts).sort((a, b) => b - a);
+    if (vals[0] === 4) return { score: 8, rankName: 'Four of a Kind', tieBreaker: [] };
+    if (vals[0] === 3 && vals[1] === 2) return { score: 7, rankName: 'Full House', tieBreaker: [] };
+    if (vals[0] === 3) return { score: 4, rankName: 'Three of a Kind', tieBreaker: [] };
+    if (vals[0] === 2 && vals[1] === 2) return { score: 3, rankName: 'Two Pair', tieBreaker: [] };
+    if (vals[0] === 2) return { score: 2, rankName: 'One Pair', tieBreaker: [] };
+    return { score: 1, rankName: 'High Card', tieBreaker: [] };
+  }
+
+  static evaluate5Cards(cards) {
+    const sorted = [...cards].sort((a, b) => b.value - a.value);
+    const values = sorted.map(c => c.value);
+    const suits = sorted.map(c => c.suit);
+
+    const isFlush = suits.every(s => s === suits[0]);
+    let isStraight = false;
+    let straightHigh = 0;
+
+    const uniqueVals = [...new Set(values)];
+    if (uniqueVals.length === 5) {
+      if (uniqueVals[0] - uniqueVals[4] === 4) {
+        isStraight = true;
+        straightHigh = uniqueVals[0];
+      } else if (
+        uniqueVals[0] === 14 && uniqueVals[1] === 5 &&
+        uniqueVals[2] === 4 && uniqueVals[3] === 3 && uniqueVals[4] === 2
+      ) {
+        isStraight = true;
+        straightHigh = 5;
+      }
+    }
+
+    if (isFlush && isStraight) {
+      if (straightHigh === 14) return { score: 10, rankName: 'Royal Flush', tieBreaker: [14] };
+      return { score: 9, rankName: 'Straight Flush', tieBreaker: [straightHigh] };
     }
 
     const counts = {};
-    sorted.forEach(c => {
-      const v = this.getCardValue(c);
-      counts[v] = counts[v] || [];
-      counts[v].push(c);
+    values.forEach(v => counts[v] = (counts[v] || 0) + 1);
+    const groups = Object.entries(counts)
+      .map(([val, count]) => ({ val: Number(val), count }))
+      .sort((a, b) => b.count - a.count || b.val - a.val);
+
+    if (groups[0].count === 4) {
+      return { score: 8, rankName: 'Four of a Kind', tieBreaker: [groups[0].val, groups[1].val] };
+    }
+    if (groups[0].count === 3 && groups[1].count === 2) {
+      return { score: 7, rankName: 'Full House', tieBreaker: [groups[0].val, groups[1].val] };
+    }
+    if (isFlush) {
+      return { score: 6, rankName: 'Flush', tieBreaker: values };
+    }
+    if (isStraight) {
+      return { score: 5, rankName: 'Straight', tieBreaker: [straightHigh] };
+    }
+    if (groups[0].count === 3) {
+      return {
+        score: 4,
+        rankName: 'Three of a Kind',
+        tieBreaker: [groups[0].val, groups[1].val, groups[2].val]
+      };
+    }
+    if (groups[0].count === 2 && groups[1].count === 2) {
+      return {
+        score: 3,
+        rankName: 'Two Pair',
+        tieBreaker: [groups[0].val, groups[1].val, groups[2].val]
+      };
+    }
+    if (groups[0].count === 2) {
+      return {
+        score: 2,
+        rankName: 'One Pair',
+        tieBreaker: [groups[0].val, groups[1].val, groups[2].val, groups[3].val]
+      };
+    }
+    return { score: 1, rankName: 'High Card', tieBreaker: values };
+  }
+
+  static compareHands(a, b) {
+    if (a.score !== b.score) return a.score - b.score;
+    for (let i = 0; i < Math.max(a.tieBreaker.length, b.tieBreaker.length); i++) {
+      const va = a.tieBreaker[i] || 0;
+      const vb = b.tieBreaker[i] || 0;
+      if (va !== vb) return va - vb;
+    }
+    return 0;
+  }
+
+  static getCombinations(arr, k) {
+    const res = [];
+    const helper = (start, combo) => {
+      if (combo.length === k) {
+        res.push(combo);
+        return;
+      }
+      for (let i = start; i < arr.length; i++) {
+        helper(i + 1, [...combo, arr[i]]);
+      }
+    };
+    helper(0, []);
+    return res;
+  }
+
+  static detectDraws(holeCards, communityCards) {
+    const all = [...this.getValidCards(holeCards), ...this.getValidCards(communityCards)];
+    if (all.length < 4 || all.length >= 7) return [];
+
+    const draws = [];
+    const suitCounts = {};
+    all.forEach(c => suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1);
+    if (Object.values(suitCounts).some(cnt => cnt === 4)) {
+      draws.push('Flush Draw');
+    }
+
+    const vals = [...new Set(all.map(c => c.value))].sort((a, b) => a - b);
+    if (vals.includes(14)) vals.unshift(1);
+
+    let hasOESD = false;
+    let hasGutshot = false;
+    for (let target = 5; target <= 14; target++) {
+      const windowVals = vals.filter(v => v >= target - 4 && v <= target);
+      if (windowVals.length === 4) {
+        const missing = [target - 4, target - 3, target - 2, target - 1, target].find(x => !windowVals.includes(x));
+        if (missing === target || missing === target - 4) hasOESD = true;
+        else hasGutshot = true;
+      }
+    }
+    if (hasOESD) draws.push('Open-Ended Straight Draw');
+    else if (hasGutshot) draws.push('Gutshot Straight Draw');
+
+    return draws;
+  }
+
+  // KALKULATOR HUD RINGKAS (OUTS ATAS + ANCAMAN MEJA + TARGET KITA + KEPUTUSAN BET)
+  static getHudSummary(holeCards, communityCards, deadCards = [], currentPot = 0, oppBet = 0) {
+    const validHole = this.getValidCards(holeCards);
+    const validComm = this.getValidCards(communityCards);
+    if (validHole.length < 2) return null;
+
+    const allKnown = [...validHole, ...validComm];
+    const usedSet = new Set([
+      ...allKnown.map(c => this.formatCardText(c)),
+      ...deadCards
+    ]);
+
+    // 1. Sisa kartu pasangan dari Hole Cards kita di luar meja
+    const holeOutCards = [];
+    validHole.forEach(hc => {
+      this.SUITS.forEach(s => {
+        const cardCode = `${hc.label}${s}`;
+        if (!usedSet.has(cardCode)) holeOutCards.push(cardCode);
+      });
     });
 
-    const quadKeys = Object.keys(counts).filter(k => counts[k].length === 4).map(Number).sort((a, b) => b - a);
-    const tripKeys = Object.keys(counts).filter(k => counts[k].length === 3).map(Number).sort((a, b) => b - a);
-    const pairKeys = Object.keys(counts).filter(k => counts[k].length === 2).map(Number).sort((a, b) => b - a);
+    // 2. Bangun sisa dek
+    const remainingDeck = [];
+    this.RANKS.forEach(r => {
+      this.SUITS.forEach(s => {
+        const text = `${r.label}${s}`;
+        if (!usedSet.has(text)) remainingDeck.push({ value: r.value, label: r.label, suit: s, text });
+      });
+    });
 
-    if (quadKeys.length > 0) {
-      const quadCards = counts[quadKeys[0]].map(c => this.formatCardText(c)).join(' ');
-      return { score: 8, rankName: `Four of a Kind (${quadCards})`, cards: sorted.slice(0, 5) };
-    }
+    const unseen = remainingDeck.length || 1;
+    const cardsToCome = validComm.length === 3 ? 2 : validComm.length === 4 ? 1 : 0;
+    const currentBest = this.getBestHand(allKnown);
 
-    if (tripKeys.length > 0 && (pairKeys.length > 0 || tripKeys.length > 1)) {
-      const tripCards = counts[tripKeys[0]].map(c => this.formatCardText(c)).join(' ');
-      const pVal = tripKeys.length > 1 ? tripKeys[1] : pairKeys[0];
-      const pairCards = counts[pVal].slice(0, 2).map(c => this.formatCardText(c)).join(' ');
-      return { score: 7, rankName: `Full House (${tripCards} ${pairCards})`, cards: sorted.slice(0, 5) };
-    }
+    // 3. Target Terkuat Kartu Kita + Persentase Efektif
+    let bestTargetText = 'Menunggu Flop';
+    let heroWinEst = 50;
+    let isDominatedLowPair = false;
 
-    if (flushCards) {
-      const topFlushCard = this.formatCardText(flushCards[0]);
-      return { score: 6, rankName: `Flush (${topFlushCard}-High)`, cards: flushCards.slice(0, 5) };
-    }
+    if (validComm.length === 0) {
+      const v1 = validHole[0].value;
+      const v2 = validHole[1].value;
+      const suited = validHole[0].suit === validHole[1].suit;
+      if (v1 === v2) heroWinEst = v1 >= 11 ? 82 : 68;
+      else if (v1 >= 12 && v2 >= 12) heroWinEst = suited ? 67 : 64;
+      else heroWinEst = suited ? 54 : 48;
+      bestTargetText = `Pre-Flop Equity ~${heroWinEst}%`;
+    } else if (validComm.length >= 3) {
+      const suitCounts = {};
+      allKnown.forEach(c => suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1);
+      const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] === 4);
+      const draws = this.detectDraws(holeCards, communityCards);
+      const hasOESD = draws.some(d => d.includes('Open-Ended'));
+      const hasGutshot = draws.some(d => d.includes('Gutshot'));
 
-    const straightVals = [...values];
-    if (straightVals.includes(14)) straightVals.push(1);
-
-    for (let i = 0; i <= straightVals.length - 5; i++) {
-      if (straightVals[i] - straightVals[i + 4] === 4) {
-        const topV = straightVals[i];
-        const topLabel = topV === 14 ? 'A' : topV === 13 ? 'K' : topV === 12 ? 'Q' : topV === 11 ? 'J' : topV;
-        
-        const straightCards = [];
-        for (let k = 0; k < 5; k++) {
-          const targetV = topV - k === 1 ? 14 : topV - k;
-          const matchCard = sorted.find(c => this.getCardValue(c) === targetV);
-          if (matchCard) straightCards.push(matchCard);
+      const calcProb = (outs) => {
+        if (cardsToCome === 2) {
+          const miss1 = (unseen - outs) / unseen;
+          const miss2 = (unseen - 1 - outs) / Math.max(1, unseen - 1);
+          return Math.round((1 - miss1 * miss2) * 100);
+        } else if (cardsToCome === 1) {
+          return Math.round((outs / unseen) * 100);
         }
+        return 0;
+      };
 
-        return { score: 5, rankName: `Straight (High ${topLabel})`, cards: straightCards };
+      const maxCommVal = Math.max(...validComm.map(c => c.value));
+      const maxHoleVal = Math.max(...validHole.map(c => c.value));
+      const uniqueHoleOutCount = [...new Set(holeOutCards)].length;
+
+      if (currentBest.score >= 5) {
+        heroWinEst = currentBest.score >= 7 ? 96 : currentBest.score === 6 ? 86 : 80;
+        bestTargetText = `${currentBest.rankName} 100% (Sudah Jadi)`;
+      } else if (flushSuit && cardsToCome > 0) {
+        const flushOuts = remainingDeck.filter(c => c.suit === flushSuit).length;
+        const prob = calcProb(flushOuts);
+        heroWinEst = currentBest.score >= 2 ? Math.min(72, prob + 18) : prob;
+        bestTargetText = `Flush ${prob}% (Kurang 1 Kartu ${flushSuit})`;
+      } else if (hasOESD && cardsToCome > 0) {
+        const prob = calcProb(8);
+        heroWinEst = currentBest.score >= 2 ? Math.min(68, prob + 16) : prob;
+        bestTargetText = `Straight ${prob}% (Kurang 1 Kartu Ujung)`;
+      } else if (hasGutshot && cardsToCome > 0) {
+        const prob = calcProb(4);
+        heroWinEst = currentBest.score >= 2 ? Math.min(55, prob + 15) : prob;
+        bestTargetText = `Straight ${prob}% (Kurang 1 Kartu Tengah)`;
+      } else if (currentBest.score === 4) {
+        heroWinEst = 84;
+        bestTargetText = cardsToCome > 0
+          ? `Full House / Quads ${calcProb(7)}% (Kurang 1 Kartu Kembar)`
+          : `Three of a Kind 100% (Sudah Jadi)`;
+      } else if (currentBest.score === 3) {
+        heroWinEst = 74;
+        bestTargetText = cardsToCome > 0
+          ? `Full House ${calcProb(4)}% (Kurang 1 Kartu Pair)`
+          : `Two Pair 100% (Sudah Jadi)`;
+      } else if (currentBest.score === 2) {
+        const prob = calcProb(uniqueHoleOutCount);
+        if (maxHoleVal < maxCommVal) {
+          isDominatedLowPair = true;
+          heroWinEst = cardsToCome > 0 ? Math.max(15, prob) : 18;
+          bestTargetText = cardsToCome > 0
+            ? `Trips / Two Pair ${prob}% (Kurang 1 Kartu ${validHole.map(c => c.label).join('/')}) • ⚠️ Pair Bawah`
+            : `One Pair Bawah • ⚠️ Rawan Top Pair Lawan`;
+        } else {
+          heroWinEst = 62;
+          bestTargetText = cardsToCome > 0
+            ? `Top Pair (Upgrade Trips/2Pair ${prob}%)`
+            : `Top Pair 100% (Sudah Jadi)`;
+        }
+      } else {
+        const prob = calcProb(uniqueHoleOutCount);
+        heroWinEst = cardsToCome > 0 ? prob : 8;
+        bestTargetText = cardsToCome > 0
+          ? `Top Pair ${prob}% (Kurang 1 Kartu ${validHole.map(c => c.label).join('/')})`
+          : `High Card Saja (Tidak Kena)`;
       }
     }
 
-    if (tripKeys.length === 1) {
-      const tripCards = counts[tripKeys[0]].map(c => this.formatCardText(c)).join(' ');
-      return { score: 4, rankName: `Three of a Kind (${tripCards})`, cards: sorted.slice(0, 5) };
+    // 4. Persentase Ancaman Meja Realistis + Deteksi Straight Flush & Nut Blocker
+    let boardPctText = 'Belum Ada Kartu Meja';
+    let dangerLevel = 0;
+    if (validComm.length >= 3) {
+      const commSuits = {};
+      validComm.forEach(c => commSuits[c.suit] = (commSuits[c.suit] || 0) + 1);
+      const maxSuit = Object.keys(commSuits).reduce((a, b) => commSuits[a] > commSuits[b] ? a : b);
+      const maxSuitCount = commSuits[maxSuit];
+      const remSuitCards = remainingDeck.filter(c => c.suit === maxSuit);
+
+      const threats = [];
+      if (maxSuitCount >= 3) {
+        dangerLevel = 2;
+        const flushRealPct = maxSuitCount === 3 ? 75 : maxSuitCount === 4 ? 92 : 100;
+
+        const suitedRanks = validComm
+          .filter(c => c.suit === maxSuit)
+          .map(c => c.value)
+          .sort((a, b) => a - b);
+        if (suitedRanks.includes(14)) suitedRanks.unshift(1);
+
+        let sfConnected = false;
+        for (let i = 0; i <= suitedRanks.length - 3; i++) {
+          if (suitedRanks[i + 2] - suitedRanks[i] <= 4) {
+            sfConnected = true;
+            break;
+          }
+        }
+        if (sfConnected) {
+          threats.push(`Straight Flush ${maxSuitCount === 3 ? '25%' : '45%'}`);
+        }
+
+        const nutCardCode = `A${maxSuit}`;
+        const secondNutCode = `K${maxSuit}`;
+        const weHoldNut = validHole.some(c => this.formatCardText(c) === nutCardCode);
+        const nutStillOut = remSuitCards.some(c => c.text === nutCardCode);
+        const secondNutStillOut = remSuitCards.some(c => c.text === secondNutCode);
+
+        let nutWarn = '';
+        if (weHoldNut) {
+          nutWarn = ` [Nut ${nutCardCode} Aman]`;
+          dangerLevel = 0;
+        } else if (nutStillOut) {
+          nutWarn = ` [Waspada ${nutCardCode}]`;
+        } else if (secondNutStillOut) {
+          nutWarn = ` [Waspada ${secondNutCode}]`;
+        }
+        threats.push(`Flush ${flushRealPct}%${nutWarn}`);
+      }
+
+      const commRanks = validComm.map(c => c.value);
+      const rankCounts = {};
+      commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
+      const pairCount = Object.values(rankCounts).filter(v => v >= 2).length;
+      if (pairCount >= 2) {
+        threats.push('Full House 85%');
+        dangerLevel = 2;
+      } else if (pairCount === 1) {
+        threats.push('Full House 65%');
+        dangerLevel = Math.max(dangerLevel, 1);
+      }
+
+      const uniqueR = [...new Set(commRanks)].sort((a, b) => a - b);
+      if (uniqueR.includes(14)) uniqueR.unshift(1);
+      let maxWindow = 0;
+      for (let t = 5; t <= 14; t++) {
+        const cnt = uniqueR.filter(r => r >= t - 4 && r <= t).length;
+        if (cnt > maxWindow) maxWindow = cnt;
+      }
+      if (maxWindow >= 4) {
+        threats.push('Straight 80%');
+        dangerLevel = 2;
+      } else if (maxWindow === 3) {
+        threats.push('Straight 55%');
+        dangerLevel = Math.max(dangerLevel, 1);
+      }
+
+      boardPctText = threats.length > 0 ? threats.join(' • ') : 'Board Kering (Top Pair / Two Pair)';
     }
 
-    if (pairKeys.length >= 2) {
-      const p1 = counts[pairKeys[0]].map(c => this.formatCardText(c)).join(' ');
-      const p2 = counts[pairKeys[1]].map(c => this.formatCardText(c)).join(' ');
-      return { score: 3, rankName: `Two Pair (${p1} & ${p2})`, cards: sorted.slice(0, 5) };
-    }
+    const decision = this.evaluatePotDecision(heroWinEst, currentPot, oppBet, isDominatedLowPair, dangerLevel);
 
-    if (pairKeys.length === 1) {
-      const pairVal = pairKeys[0];
-      const pairCards = counts[pairVal].map(c => this.formatCardText(c)).join(' ');
-      const kickers = sorted.filter(c => this.getCardValue(c) !== pairVal);
-      const topKicker = kickers.length > 0 ? this.formatCardText(kickers[0]) : '';
+    return {
+      currentBestName: currentBest.rankName,
+      holeOutCards: [...new Set(holeOutCards)],
+      bestTargetText,
+      boardPctText,
+      heroWinEst,
+      decision
+    };
+  }
 
-      return { 
-        score: 2, 
-        rankName: `One Pair (${pairCards}) - Kicker [${topKicker}]`, 
-        cards: sorted.slice(0, 5) 
+  static evaluatePotDecision(winPct, pot, bet, isDominatedLowPair, dangerLevel) {
+    const p = Number(pot) || 0;
+    const b = Number(bet) || 0;
+
+    if (b <= 0) {
+      if (winPct >= 70 && dangerLevel < 2) {
+        return {
+          verdict: 'RAISE / VALUE BET',
+          badgeClass: 'verdict-raise',
+          detail: `Kartu kuat (${winPct}%). Pancing lawan bayar dengan Raise 2x–3x Blind.`
+        };
+      }
+      return {
+        verdict: 'CHECK / BET KECIL',
+        badgeClass: 'verdict-call',
+        detail: 'Belum ada bet lawan. Ambil kartu gratis (Check) atau pancing tipis.'
       };
     }
 
-    const topCard = this.formatCardText(sorted[0]);
-    return { score: 1, rankName: `High Card (${topCard})`, cards: sorted.slice(0, 5) };
-  }
+    const totalPotAfterCall = p + b;
+    const reqEquity = Math.round((b / totalPotAfterCall) * 100);
+    const evDiff = winPct - reqEquity;
 
-  // 7. ANALISIS ANCAMAN MEJA UNIVERSAL
-  static analyzeBoardThreats(communityCards, holeCards = []) {
-    const comm = this.getValidCards(communityCards);
-    if (comm.length < 3) {
-      return [{
-        text: "Menunggu Flop (Minimal 3 Kartu Komunitas)",
-        boardPotential: "Belum Ada Board",
-        worstCase: "Belum Ada Board",
-        indicator: "^",
-        safe: true
-      }];
+    if (isDominatedLowPair && b >= p * 0.5) {
+      return {
+        verdict: 'FOLD (RUGI)',
+        badgeClass: 'verdict-fold',
+        detail: `Syarat Pot Odds ${reqEquity}%, peluang kita cuma ${winPct}% (Pair Bawah). Jangan kejar!`
+      };
     }
 
-    const threats = [];
-    const validHand = this.getValidCards(holeCards);
-    const totalCards = [...validHand, ...comm];
-    const myBest = this.getBestHand(totalCards);
-    const myScore = myBest ? myBest.score : 0; 
-
-    const commRanks = comm.map(c => this.getCardValue(c)).sort((a, b) => b - a);
-    const maxRank = commRanks[0];
-    const maxLabel = maxRank === 14 ? 'A' : maxRank === 13 ? 'K' : maxRank === 12 ? 'Q' : maxRank === 11 ? 'J' : maxRank;
-
-    const suitCounts = {};
-    comm.forEach(c => {
-      const s = this.getCardSuitSymbol(c);
-      suitCounts[s] = (suitCounts[s] || 0) + 1;
-    });
-    const maxSuitCount = Math.max(...Object.values(suitCounts));
-    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] === maxSuitCount);
-
-    const rankCounts = {};
-    commRanks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
-    const boardHasPair = Object.values(rankCounts).some(count => count >= 2);
-    const boardHasThreeOfAKind = Object.values(rankCounts).some(count => count >= 3);
-
-    let boardStructureText = "";
-    let highestBoardComboName = "";
-    let worstCaseMessage = "";
-    let absoluteMaxPossibleScore = 1;
-
-    if (boardHasThreeOfAKind) {
-      boardStructureText = `Three of a Kind di Meja [Top Card ${maxLabel}]`;
-      absoluteMaxPossibleScore = 8;
-      highestBoardComboName = "Four of a Kind";
-      worstCaseMessage = `🚨 <b>ANCAMAN FOUR OF A KIND:</b> Ada Three of a Kind di meja! Lawan yang memegang 1 kartu tersisa membentuk Four of a Kind.`;
-    } else if (boardHasPair) {
-      boardStructureText = `Pair di Meja [Top Card ${maxLabel}]`;
-      absoluteMaxPossibleScore = 7;
-      highestBoardComboName = "Full House / Three of a Kind";
-      worstCaseMessage = `🏠 <b>MEJA BERPASANGAN:</b> Waspada lawan memegang Set/Pair untuk membentuk Full House.`;
-    } else if (maxSuitCount >= 3) {
-      boardStructureText = `Koneksi Flush (${maxSuitCount} Kembang ${flushSuit})`;
-      absoluteMaxPossibleScore = 6;
-      highestBoardComboName = `Flush (Kembang ${flushSuit})`;
-      worstCaseMessage = `🌊 <b>POTENSI FLUSH:</b> Meja ada 3+ kembang ${flushSuit}. Lawan dengan kembang ${flushSuit} memegang Flush.`;
-    } else {
-      boardStructureText = `High Card Meja [${maxLabel}]`;
-      absoluteMaxPossibleScore = 2;
-      highestBoardComboName = `Top Pair / Two Pair [Top Card ${maxLabel}]`;
-      worstCaseMessage = `👑 <b>ANCAMAN TOP PAIR:</b> Lawan yang memegang kartu [${maxLabel}] membentuk Top Pair.`;
+    if (winPct >= 72 && dangerLevel < 2) {
+      return {
+        verdict: 'RAISE / ALL-IN (GAS!)',
+        badgeClass: 'verdict-raise',
+        detail: `Peluang ${winPct}% vs Syarat ${reqEquity}% (+${evDiff}% EV). Hajar balik!`
+      };
     }
 
-    const isSafe = myScore >= absoluteMaxPossibleScore;
-    threats.push({
-      text: `[${comm.length === 3 ? 'FLOP' : comm.length === 4 ? 'TURN' : 'RIVER'}] Struktur Meja: ${boardStructureText}`,
-      boardPotential: `Potensi Terkuat Lawan: ${highestBoardComboName} | Anda: ${myBest.rankName}`,
-      worstCase: isSafe ? `✅ <b>DOMINAN:</b> Kombinasi Anda (${myBest.rankName}) adalah yang tertinggi di meja saat ini.` : worstCaseMessage,
-      indicator: isSafe ? "^" : "v",
-      safe: isSafe
-    });
+    if (winPct >= reqEquity) {
+      return {
+        verdict: 'CALL (WORTH IT)',
+        badgeClass: 'verdict-call',
+        detail: `Peluang ${winPct}% ≥ Syarat Pot Odds ${reqEquity}% (+${evDiff}% EV). Layak dikejar!`
+      };
+    }
 
-    return threats;
+    return {
+      verdict: 'FOLD (MAHAL)',
+      badgeClass: 'verdict-fold',
+      detail: `Butuh ${reqEquity}% untuk impas, peluang kita cuma ${winPct}% (${evDiff}% EV). Lepas!`
+    };
   }
 }
