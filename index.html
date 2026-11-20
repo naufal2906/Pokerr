@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PKV AR Camera HUD Pro</title>
+  <title>PKV AR Camera HUD Pro (9-Seat Relatif)</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
   <div class="app-shell">
-    <!-- TOP BAR ALA MEJA PKV -->
+    <!-- TOP BAR PKV -->
     <header class="pkv-topbar">
       <div class="table-info">
-        <span class="table-name">Table 51 • 9-Max</span>
-        <span class="blind-pill">300 / 600</span>
+        <span class="table-name">PKV 9-Max • Relatif</span>
+        <span class="active-opp-pill">Lawan Ikut: <strong id="active-opp-count">3</strong> Org</span>
       </div>
       <div class="pot-pill">
         <span>POT:</span>
@@ -27,18 +27,27 @@
 
     <!-- ARENA MEJA PKV + KAMERA REAL-TIME -->
     <main class="pkv-table-arena" id="table-arena">
-      <!-- Latar Kamera Belakang iOS (Aktif saat tombol Kamera ditekan) -->
       <video id="ar-camera-video" autoplay muted playsinline class="hidden"></video>
       <canvas id="ar-process-canvas" width="360" height="640" class="hidden"></canvas>
 
       <!-- Garis Bingkai Meja Lonjong PKV -->
       <div class="pkv-oval-felt"></div>
 
-      <!-- KONTROL KALIBRASI KAMERA (MUNCUL SAAT KAMERA AKTIF) -->
+      <!-- 8 KURSI LAWAN RELATIF (DIURUTKAN DARI KIRI HERO: 2 SAMPAI 9) -->
+      <button type="button" class="seat-node seat-2 active" data-seat="2">2</button>
+      <button type="button" class="seat-node seat-3 active" data-seat="3">3</button>
+      <button type="button" class="seat-node seat-4 active" data-seat="4">4</button>
+      <button type="button" class="seat-node seat-5" data-seat="5">5</button>
+      <button type="button" class="seat-node seat-6" data-seat="6">6</button>
+      <button type="button" class="seat-node seat-7" data-seat="7">7</button>
+      <button type="button" class="seat-node seat-8" data-seat="8">8</button>
+      <button type="button" class="seat-node seat-9" data-seat="9">9</button>
+
+      <!-- KONTROL KALIBRASI KAMERA -->
       <div id="cam-toolbar" class="cam-toolbar hidden">
-        <span id="scan-badge" class="scan-status">🔴 SCAN AKTIF</span>
+        <span id="scan-badge" class="scan-status">🔴 LIVE AR SCAN</span>
         <button type="button" id="btn-toggle-calib" class="btn-mini">⚙️ Geser Kotak</button>
-        <button type="button" id="btn-stop-cam" class="btn-mini danger">Tutup Cam</button>
+        <button type="button" id="btn-stop-cam" class="btn-mini danger">Tutup</button>
       </div>
 
       <div id="calib-panel" class="calib-panel hidden">
@@ -56,7 +65,7 @@
       <div class="hud-overlay-top">
         <div class="hud-mini-label">OUTS SISA KARTU (Tap jika mati):</div>
         <div id="hud-outs-chips" class="outs-row">
-          <span class="muted">Arahkan kamera ke meja atau tap kartu</span>
+          <span class="muted">Tap kursi 2–9 yang ikut • Scan / pilih kartu</span>
         </div>
       </div>
 
@@ -87,10 +96,9 @@
           <span id="hud-hero-target" class="stat-text cyan">Scan / Pilih 2 Kartu Tangan</span>
         </div>
 
-        <!-- BARIS CEPAT BET LAWAN & KEPUTUSAN -->
         <div class="bet-control-strip">
           <div class="bet-input-wrap">
-            <span>Bet Lawan:</span>
+            <span>Bet:</span>
             <input type="number" id="input-bet" value="600" step="300" min="0">
           </div>
           <div class="quick-bets">
@@ -108,13 +116,13 @@
         </div>
       </div>
 
-      <!-- 4. KURSI BAWAH (HERO): 2 KARTU KITA -->
+      <!-- 4. KURSI 1 (PATOKAN KITA / HERO DI BAWAH TENGAH) -->
       <div class="hero-seat-zone" id="hole-zone">
         <div class="hero-cards">
           <div class="pkv-card-slot active-slot" data-type="hole" data-index="0">?</div>
           <div class="pkv-card-slot" data-type="hole" data-index="1">?</div>
         </div>
-        <div class="hero-plate">HERO (KURSI KITA)</div>
+        <div class="hero-plate">1 • KITA (HERO)</div>
       </div>
     </main>
 
