@@ -6,12 +6,11 @@ class PokerApp {
     this.activeSlot = { type: 'hole', index: 0 };
     this.selectedSuit = '♠';
 
-    this.mediaStream = null;
-    this.scanTimer = null;
+    // Properti Kamera AR iOS
+    this.cameraStream = null;
+    this.scanInterval = null;
     this.ocrWorker = null;
-    this.isScanningFrame = false;
-    this.commYPercent = 0.315;
-    this.holeYPercent = 0.625;
+    this.isProcessingFrame = false;
 
     this.loadSavedState();
     this.init();
@@ -22,8 +21,7 @@ class PokerApp {
     this.bindSuitTabs();
     this.bindSlots();
     this.bindPotOddsEvents();
-    this.bindAutoScanEvents();
-    this.bindGlassMode();
+    this.bindCameraEvents();
     this.bindReset();
     this.render();
   }
@@ -37,13 +35,13 @@ class PokerApp {
         pot: document.getElementById('input-pot')?.value || '1800',
         bet: document.getElementById('input-bet')?.value || '600'
       };
-      localStorage.setItem('poker_hud_sticky_state', JSON.stringify(state));
+      localStorage.setItem('pkv_ar_hud_state', JSON.stringify(state));
     } catch (e) {}
   }
 
   loadSavedState() {
     try {
-      const raw = localStorage.getItem('poker_hud_sticky_state');
+      const raw = localStorage.getItem('pkv_ar_hud_state');
       if (!raw) return;
       const state = JSON.parse(raw);
       if (state.holeCards) this.holeCards = state.holeCards;
@@ -57,15 +55,6 @@ class PokerApp {
         this.render();
       }, 50);
     } catch (e) {}
-  }
-
-  bindGlassMode() {
-    const glassBtn = document.getElementById('btn-glass-mode');
-    if (!glassBtn) return;
-    glassBtn.addEventListener('click', () => {
-      document.body.classList.toggle('glass-mode');
-      glassBtn.classList.toggle('active');
-    });
   }
 
   renderRankKeypad() {
@@ -107,7 +96,7 @@ class PokerApp {
   }
 
   bindSlots() {
-    document.querySelectorAll('.card-slot').forEach(slot => {
+    document.querySelectorAll('.pkv-card-slot').forEach(slot => {
       slot.addEventListener('click', () => {
         const type = slot.dataset.type;
         const index = Number(slot.dataset.index);
@@ -168,47 +157,55 @@ class PokerApp {
       const betInput = document.getElementById('input-bet');
       if (potInput) potInput.value = '1800';
       if (betInput) betInput.value = '600';
-      localStorage.removeItem('poker_hud_sticky_state');
+      localStorage.removeItem('pkv_ar_hud_state');
       this.render();
     });
   }
 
-  bindAutoScanEvents() {
-    const btnStart = document.getElementById('btn-auto-scan');
-    const btnStop = document.getElementById('btn-stop-scan');
-    const btnCalib = document.getElementById('btn-calibrate');
-    const calibBox = document.getElementById('calib-controls');
-    const rangeCommY = document.getElementById('range-comm-y');
-    const rangeHoleY = document.getElementById('range-hole-y');
+  // =========================================================
+  // MODUL KAMERA AR REAL-TIME UNTUK SAFARI iOS (2 HP)
+  // =========================================================
+  bindCameraEvents() {
+    const btnCam = document.getElementById('btn-cam-scan');
+    const btnStop = document.getElementById('btn-stop-cam');
+    const btnCalib = document.getElementById('btn-toggle-calib');
+    const calibPanel = document.getElementById('calib-panel');
+    const sliderCommY = document.getElementById('slider-comm-y');
+    const sliderHoleY = document.getElementById('slider-hole-y');
 
-    if (btnStart) btnStart.addEventListener('click', () => this.startScreenScan());
-    if (btnStop) btnStop.addEventListener('click', () => this.stopScreenScan());
-    if (btnCalib && calibBox) {
-      btnCalib.addEventListener('click', () => calibBox.classList.toggle('hidden'));
+    if (btnCam) btnCam.addEventListener('click', () => this.startArCamera());
+    if (btnStop) btnStop.addEventListener('click', () => this.stopArCamera());
+    if (btnCalib && calibPanel) {
+      btnCalib.addEventListener('click', () => calibPanel.classList.toggle('hidden'));
     }
-    if (rangeCommY) {
-      rangeCommY.addEventListener('input', (e) => {
-        this.commYPercent = Number(e.target.value) / 100;
-        document.getElementById('val-comm-y').textContent = `${e.target.value}%`;
+
+    // Geser posisi vertikal zona kartu komunitas & kartu kita secara visual agar pas dengan layar HP ke-2
+    if (sliderCommY) {
+      sliderCommY.addEventListener('input', (e) => {
+        document.getElementById('lbl-comm-y').textContent = `${e.target.value}%`;
+        const commZone = document.getElementById('comm-zone');
+        if (commZone) commZone.style.marginTop = `${(Number(e.target.value) - 33) * 3}px`;
       });
     }
-    if (rangeHoleY) {
-      rangeHoleY.addEventListener('input', (e) => {
-        this.holeYPercent = Number(e.target.value) / 100;
-        document.getElementById('val-hole-y').textContent = `${e.target.value}%`;
+    if (sliderHoleY) {
+      sliderHoleY.addEventListener('input', (e) => {
+        document.getElementById('lbl-hole-y').textContent = `${e.target.value}%`;
+        const holeZone = document.getElementById('hole-zone');
+        if (holeZone) holeZone.style.marginBottom = `${(64 - Number(e.target.value)) * 3}px`;
       });
     }
   }
 
-  async startScreenScan() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      alert('Gunakan Google Chrome di Android untuk fitur Auto-Scan layar!');
+  async startArCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Pastikan situs dibuka lewat HTTPS di Safari iPhone agar kamera dapat diakses.');
       return;
     }
 
     try {
-      const badge = document.getElementById('scan-status-badge');
-      if (badge) badge.textContent = 'Memuat OCR...';
+      const badge = document.getElementById('scan-badge');
+      document.getElementById('cam-toolbar')?.classList.remove('hidden');
+      if (badge) badge.textContent = '⏳ MEMUAT OCR...';
 
       if (!this.ocrWorker && window.Tesseract) {
         this.ocrWorker = await Tesseract.createWorker('eng');
@@ -217,148 +214,140 @@ class PokerApp {
         });
       }
 
-      this.mediaStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 5 },
+      // Aktifkan kamera belakang iPhone resolusi tajam
+      this.cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false
       });
 
-      const video = document.getElementById('screen-video');
-      video.srcObject = this.mediaStream;
+      const video = document.getElementById('ar-camera-video');
+      video.srcObject = this.cameraStream;
+      video.classList.remove('hidden');
       await video.play();
 
-      document.getElementById('scanner-box')?.classList.remove('hidden');
-      if (badge) {
-        badge.textContent = 'LIVE SCAN';
-        badge.classList.add('live');
+      document.getElementById('table-arena')?.classList.add('camera-on');
+      if (badge) badge.textContent = '🔴 LIVE AR SCAN';
+
+      this.scanInterval = setInterval(() => this.scanAlignedSlots(), 1200);
+    } catch (err) {
+      alert('Izin kamera ditolak atau tidak tersedia: ' + err.message);
+      this.stopArCamera();
+    }
+  }
+
+  stopArCamera() {
+    if (this.scanInterval) {
+      clearInterval(this.scanInterval);
+      this.scanInterval = null;
+    }
+    if (this.cameraStream) {
+      this.cameraStream.getTracks().forEach(t => t.stop());
+      this.cameraStream = null;
+    }
+    document.getElementById('ar-camera-video')?.classList.add('hidden');
+    document.getElementById('cam-toolbar')?.classList.add('hidden');
+    document.getElementById('calib-panel')?.classList.add('hidden');
+    document.getElementById('table-arena')?.classList.remove('camera-on');
+  }
+
+  // Membaca gambar kamera PERSIS di balik setiap kotak slot kartu pada layar AR!
+  async scanAlignedSlots() {
+    if (this.isProcessingFrame || !this.cameraStream) return;
+    const video = document.getElementById('ar-camera-video');
+    const arena = document.getElementById('table-arena');
+    const procCanvas = document.getElementById('ar-process-canvas');
+    if (!video || !arena || !procCanvas || video.videoWidth === 0) return;
+
+    this.isProcessingFrame = true;
+    try {
+      const arenaRect = arena.getBoundingClientRect();
+      procCanvas.width = arenaRect.width;
+      procCanvas.height = arenaRect.height;
+      const ctx = procCanvas.getContext('2d');
+
+      // Hitung rasio object-fit: cover agar koordinat slot 100% presisi dengan video kamera
+      const vRatio = video.videoWidth / video.videoHeight;
+      const aRatio = arenaRect.width / arenaRect.height;
+      let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
+
+      if (vRatio > aRatio) {
+        sw = video.videoHeight * aRatio;
+        sx = (video.videoWidth - sw) / 2;
+      } else {
+        sh = video.videoWidth / aRatio;
+        sy = (video.videoHeight - sh) / 2;
       }
 
-      this.mediaStream.getVideoTracks()[0].addEventListener('ended', () => {
-        this.stopScreenScan();
-      });
-
-      this.scanTimer = setInterval(() => this.processScreenFrame(), 1300);
-    } catch (err) {
-      alert('Auto-Scan dibatalkan: ' + err.message);
-      this.stopScreenScan();
-    }
-  }
-
-  stopScreenScan() {
-    if (this.scanTimer) {
-      clearInterval(this.scanTimer);
-      this.scanTimer = null;
-    }
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach(t => t.stop());
-      this.mediaStream = null;
-    }
-    document.getElementById('scanner-box')?.classList.add('hidden');
-    const badge = document.getElementById('scan-status-badge');
-    if (badge) {
-      badge.textContent = 'Manual';
-      badge.classList.remove('live');
-    }
-  }
-
-  getCardRegions(w, h) {
-    const cw = w * 0.092;
-    const ch = h * 0.068;
-
-    const commY1 = h * this.commYPercent;
-    const commY2 = commY1 + ch + (h * 0.011);
-    const holeY = h * this.holeYPercent;
-
-    return {
-      hole: [
-        { x: w * 0.408, y: holeY, w: cw, h: ch },
-        { x: w * 0.508, y: holeY, w: cw, h: ch }
-      ],
-      comm: [
-        { x: w * 0.345, y: commY1, w: cw, h: ch },
-        { x: w * 0.450, y: commY1, w: cw, h: ch },
-        { x: w * 0.555, y: commY1, w: cw, h: ch },
-        { x: w * 0.398, y: commY2, w: cw, h: ch },
-        { x: w * 0.503, y: commY2, w: cw, h: ch }
-      ]
-    };
-  }
-
-  async processScreenFrame() {
-    if (this.isScanningFrame || !this.mediaStream) return;
-    const video = document.getElementById('screen-video');
-    const preview = document.getElementById('scan-preview-canvas');
-    if (!video || !preview || video.videoWidth === 0) return;
-
-    this.isScanningFrame = true;
-    try {
-      const ctx = preview.getContext('2d');
-      const pw = preview.width;
-      const ph = preview.height;
-
-      ctx.drawImage(video, 0, 0, pw, ph);
-      const regions = this.getCardRegions(pw, ph);
-
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = '#00f0ff';
-      regions.hole.forEach(r => ctx.strokeRect(r.x, r.y, r.w, r.h));
-      ctx.strokeStyle = '#fbbf24';
-      regions.comm.forEach(r => ctx.strokeRect(r.x, r.y, r.w, r.h));
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, arenaRect.width, arenaRect.height);
 
       let updated = false;
+      const slots = document.querySelectorAll('.pkv-card-slot');
 
-      for (let i = 0; i < 2; i++) {
-        if (!this.holeCards[i]) {
-          const detected = await this.detectCardFromRegion(preview, regions.hole[i]);
-          if (detected) {
-            this.holeCards[i] = detected;
-            updated = true;
-          }
-        }
-      }
+      for (const slot of slots) {
+        const type = slot.dataset.type;
+        const idx = Number(slot.dataset.index);
 
-      for (let i = 0; i < 5; i++) {
-        if (!this.communityCards[i]) {
-          const detected = await this.detectCardFromRegion(preview, regions.comm[i]);
-          if (detected) {
-            this.communityCards[i] = detected;
-            updated = true;
-          }
+        // Sticky Lock: Lewati slot yang sudah terisi agar histori tidak hilang saat bergerak
+        if (type === 'hole' && this.holeCards[idx]) continue;
+        if (type === 'comm' && this.communityCards[idx]) continue;
+
+        const sRect = slot.getBoundingClientRect();
+        const relX = sRect.left - arenaRect.left;
+        const relY = sRect.top - arenaRect.top;
+
+        const detected = await this.recognizeCardBox(procCanvas, {
+          x: relX,
+          y: relY,
+          w: sRect.width,
+          h: sRect.height
+        });
+
+        if (detected) {
+          if (type === 'hole') this.holeCards[idx] = detected;
+          else this.communityCards[idx] = detected;
+          updated = true;
         }
       }
 
       if (updated) this.render();
     } finally {
-      this.isScanningFrame = false;
+      this.isProcessingFrame = false;
     }
   }
 
-  async detectCardFromRegion(sourceCanvas, rect) {
+  async recognizeCardBox(sourceCanvas, rect) {
     const crop = document.createElement('canvas');
     crop.width = 64;
-    crop.height = 64;
+    crop.height = 80;
     const cctx = crop.getContext('2d');
-    cctx.drawImage(sourceCanvas, rect.x, rect.y, rect.w, rect.h, 0, 0, 64, 64);
+    cctx.drawImage(sourceCanvas, rect.x, rect.y, rect.w, rect.h, 0, 0, 64, 80);
 
-    const imgData = cctx.getImageData(0, 0, 64, 64).data;
-    let whitePixels = 0;
+    const imgData = cctx.getImageData(0, 0, 64, 80).data;
+    let brightPixels = 0;
     let redPixels = 0;
-    let blackPixels = 0;
+    let darkPixels = 0;
 
     for (let i = 0; i < imgData.length; i += 4) {
       const r = imgData[i], g = imgData[i + 1], b = imgData[i + 2];
-      if (r > 185 && g > 185 && b > 185) whitePixels++;
-      else if (r > 140 && g < 85 && b < 85) redPixels++;
-      else if (r < 85 && g < 85 && b < 85) blackPixels++;
+      // Toleransi kartu putih/abu terang di layar HP kedua
+      if (r > 155 && g > 155 && b > 155) brightPixels++;
+      else if (r > 135 && g < 85 && b < 85) redPixels++;
+      else if (r < 90 && g < 90 && b < 90) darkPixels++;
     }
 
-    if (whitePixels < (64 * 64 * 0.25)) return null;
-    const suit = redPixels > blackPixels ? '♥' : '♠';
+    if (brightPixels < (64 * 80 * 0.25)) return null;
+    const suit = redPixels > darkPixels ? '♥' : '♠';
     if (!this.ocrWorker) return null;
 
+    // Ambil sudut kiri-atas kartu tempat angka/huruf berada
     const rankCrop = document.createElement('canvas');
-    rankCrop.width = 40;
-    rankCrop.height = 40;
-    rankCrop.getContext('2d').drawImage(crop, 0, 0, 34, 34, 0, 0, 40, 40);
+    rankCrop.width = 48;
+    rankCrop.height = 48;
+    rankCrop.getContext('2d').drawImage(crop, 2, 2, 34, 38, 0, 0, 48, 48);
 
     const { data: { text } } = await this.ocrWorker.recognize(rankCrop);
     const clean = text.trim().toUpperCase().replace(/[^AKQJT0-9]/g, '');
@@ -382,7 +371,7 @@ class PokerApp {
 
   render() {
     const defaultCommLabels = ['F1', 'F2', 'F3', 'T', 'R'];
-    document.querySelectorAll('.card-slot').forEach(slot => {
+    document.querySelectorAll('.pkv-card-slot').forEach(slot => {
       const type = slot.dataset.type;
       const idx = Number(slot.dataset.index);
       const card = type === 'hole' ? this.holeCards[idx] : this.communityCards[idx];
@@ -424,13 +413,13 @@ class PokerApp {
     this.saveState();
 
     if (!hud) {
-      if (outsEl) outsEl.innerHTML = '<span class="muted-text">Pilih / Scan 2 kartu tangan dulu</span>';
+      if (outsEl) outsEl.innerHTML = '<span class="muted">Arahkan kamera ke meja atau tap kartu</span>';
       if (boardPctEl) boardPctEl.textContent = 'Belum Ada Kartu Meja';
-      if (heroTargetEl) heroTargetEl.textContent = 'Pilih / Scan 2 Kartu Tangan';
+      if (heroTargetEl) heroTargetEl.textContent = 'Scan / Pilih 2 Kartu Tangan';
       if (handBadgeEl) handBadgeEl.textContent = '-';
-      if (bannerEl) bannerEl.className = 'decision-banner verdict-call';
+      if (bannerEl) bannerEl.className = 'decision-bar verdict-call';
       if (verdictEl) verdictEl.textContent = 'MENUNGGU KARTU';
-      if (detailEl) detailEl.textContent = 'Aktifkan Scan layar atau tap kartu manual.';
+      if (detailEl) detailEl.textContent = 'Tekan 📷 Kamera untuk scan layar HP main';
       return;
     }
 
@@ -458,7 +447,7 @@ class PokerApp {
     if (heroTargetEl) heroTargetEl.textContent = hud.bestTargetText;
 
     if (bannerEl && verdictEl && detailEl) {
-      bannerEl.className = `decision-banner ${hud.decision.badgeClass}`;
+      bannerEl.className = `decision-bar ${hud.decision.badgeClass}`;
       verdictEl.textContent = hud.decision.verdict;
       detailEl.textContent = hud.decision.detail;
     }
