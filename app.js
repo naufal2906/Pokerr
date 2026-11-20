@@ -6,11 +6,12 @@ class PokerApp {
     this.activeSlot = { type: 'hole', index: 0 };
     this.selectedSuit = '♠';
 
-    // Properti Kamera AR iOS
+    // Properti Kamera AR iOS + Buffer Validasi 2x Frame
     this.cameraStream = null;
     this.scanInterval = null;
     this.ocrWorker = null;
     this.isProcessingFrame = false;
+    this.pendingDetections = {}; // Menyimpan hasil baca sementara untuk konfirmasi 2x
 
     this.loadSavedState();
     this.init();
@@ -24,6 +25,14 @@ class PokerApp {
     this.bindCameraEvents();
     this.bindReset();
     this.render();
+  }
+
+  // Daftar seluruh kode kartu yang sudah terpakai di tangan maupun meja (Anti-Duplikat)
+  getUsedCardCodes() {
+    const set = new Set();
+    this.holeCards.forEach(c => { if (c) set.add(`${c.label}${c.suit}`); });
+    this.communityCards.forEach(c => { if (c) set.add(`${c.label}${c.suit}`); });
+    return set;
   }
 
   saveState() {
@@ -61,10 +70,7 @@ class PokerApp {
     const grid = document.getElementById('rank-grid');
     if (!grid) return;
     const isRed = this.selectedSuit === '♥' || this.selectedSuit === '♦';
-    const usedSet = new Set([
-      ...this.holeCards.filter(Boolean).map(c => `${c.label}${c.suit}`),
-      ...this.communityCards.filter(Boolean).map(c => `${c.label}${c.suit}`)
-    ]);
+    const usedSet = this.getUsedCardCodes();
 
     grid.innerHTML = PokerEvaluator.RANKS.map(r => {
       const code = `${r.label}${this.selectedSuit}`;
@@ -104,6 +110,7 @@ class PokerApp {
         if (this.activeSlot.type === type && this.activeSlot.index === index) {
           if (type === 'hole' && this.holeCards[index]) this.holeCards[index] = null;
           else if (type === 'comm' && this.communityCards[index]) this.communityCards[index] = null;
+          delete this.pendingDetections[`${type}-${index}`];
         }
         this.activeSlot = { type, index };
         this.render();
@@ -152,6 +159,7 @@ class PokerApp {
       this.holeCards = [null, null];
       this.communityCards = [null, null, null, null, null];
       this.deadCards = [];
+      this.pendingDetections = {};
       this.activeSlot = { type: 'hole', index: 0 };
       const potInput = document.getElementById('input-pot');
       const betInput = document.getElementById('input-bet');
@@ -163,7 +171,7 @@ class PokerApp {
   }
 
   // =========================================================
-  // MODUL KAMERA AR REAL-TIME UNTUK SAFARI iOS (2 HP)
+  // MODUL KAMERA AR REAL-TIME (ANTI-DUPLIKAT + VALIDASI 2X)
   // =========================================================
   bindCameraEvents() {
     const btnCam = document.getElementById('btn-cam-scan');
@@ -179,7 +187,6 @@ class PokerApp {
       btnCalib.addEventListener('click', () => calibPanel.classList.toggle('hidden'));
     }
 
-    // Geser posisi vertikal zona kartu komunitas & kartu kita secara visual agar pas dengan layar HP ke-2
     if (sliderCommY) {
       sliderCommY.addEventListener('input', (e) => {
         document.getElementById('lbl-comm-y').textContent = `${e.target.value}%`;
@@ -210,11 +217,11 @@ class PokerApp {
       if (!this.ocrWorker && window.Tesseract) {
         this.ocrWorker = await Tesseract.createWorker('eng');
         await this.ocrWorker.setParameters({
-          tessedit_char_whitelist: 'AKQJT1098765432'
+          tessedit_char_whitelist: 'AKQJT1098765432',
+          tessedit_pageseg_mode: '10' // Single character / token mode agar tidak salah baca garis acak
         });
       }
 
-      // Aktifkan kamera belakang iPhone resolusi tajam
       this.cameraStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
@@ -232,7 +239,7 @@ class PokerApp {
       document.getElementById('table-arena')?.classList.add('camera-on');
       if (badge) badge.textContent = '🔴 LIVE AR SCAN';
 
-      this.scanInterval = setInterval(() => this.scanAlignedSlots(), 1200);
+      this.scanInterval = setInterval(() => this.scanAlignedSlots(), 1000);
     } catch (err) {
       alert('Izin kamera ditolak atau tidak tersedia: ' + err.message);
       this.stopArCamera();
@@ -248,13 +255,13 @@ class PokerApp {
       this.cameraStream.getTracks().forEach(t => t.stop());
       this.cameraStream = null;
     }
+    this.pendingDetections = {};
     document.getElementById('ar-camera-video')?.classList.add('hidden');
     document.getElementById('cam-toolbar')?.classList.add('hidden');
     document.getElementById('calib-panel')?.classList.add('hidden');
     document.getElementById('table-arena')?.classList.remove('camera-on');
   }
 
-  // Membaca gambar kamera PERSIS di balik setiap kotak slot kartu pada layar AR!
   async scanAlignedSlots() {
     if (this.isProcessingFrame || !this.cameraStream) return;
     const video = document.getElementById('ar-camera-video');
@@ -269,7 +276,6 @@ class PokerApp {
       procCanvas.height = arenaRect.height;
       const ctx = procCanvas.getContext('2d');
 
-      // Hitung rasio object-fit: cover agar koordinat slot 100% presisi dengan video kamera
       const vRatio = video.videoWidth / video.videoHeight;
       const aRatio = arenaRect.width / arenaRect.height;
       let sx = 0, sy = 0, sw = video.videoWidth, sh = video.videoHeight;
@@ -285,13 +291,14 @@ class PokerApp {
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, arenaRect.width, arenaRect.height);
 
       let updated = false;
+      const usedSet = this.getUsedCardCodes();
       const slots = document.querySelectorAll('.pkv-card-slot');
 
       for (const slot of slots) {
         const type = slot.dataset.type;
         const idx = Number(slot.dataset.index);
+        const slotKey = `${type}-${idx}`;
 
-        // Sticky Lock: Lewati slot yang sudah terisi agar histori tidak hilang saat bergerak
         if (type === 'hole' && this.holeCards[idx]) continue;
         if (type === 'comm' && this.communityCards[idx]) continue;
 
@@ -306,10 +313,28 @@ class PokerApp {
           h: sRect.height
         });
 
-        if (detected) {
+        if (!detected) {
+          delete this.pendingDetections[slotKey];
+          continue;
+        }
+
+        const cardCode = `${detected.label}${detected.suit}`;
+
+        // 1. BLOKIR JIKA KARTU SUDAH ADA DI SLOT LAIN (ANTI-DUPLIKAT 4 KARTU SAMA!)
+        if (usedSet.has(cardCode)) {
+          continue;
+        }
+
+        // 2. WAJIB TERBACA SAMA 2x BERTURUT-TURUT SEBELUM DIKUNCI
+        const prev = this.pendingDetections[slotKey];
+        if (prev && prev.code === cardCode) {
           if (type === 'hole') this.holeCards[idx] = detected;
           else this.communityCards[idx] = detected;
+          usedSet.add(cardCode); // Langsung tandai terpakai agar slot sebelahnya tidak ikut terisi
+          delete this.pendingDetections[slotKey];
           updated = true;
+        } else {
+          this.pendingDetections[slotKey] = { code: cardCode, card: detected };
         }
       }
 
@@ -327,41 +352,61 @@ class PokerApp {
     cctx.drawImage(sourceCanvas, rect.x, rect.y, rect.w, rect.h, 0, 0, 64, 80);
 
     const imgData = cctx.getImageData(0, 0, 64, 80).data;
-    let brightPixels = 0;
-    let redPixels = 0;
-    let darkPixels = 0;
+    let whiteCardPixels = 0;
+    let redInkPixels = 0;
+    let darkInkPixels = 0;
 
     for (let i = 0; i < imgData.length; i += 4) {
       const r = imgData[i], g = imgData[i + 1], b = imgData[i + 2];
-      // Toleransi kartu putih/abu terang di layar HP kedua
-      if (r > 155 && g > 155 && b > 155) brightPixels++;
-      else if (r > 135 && g < 85 && b < 85) redPixels++;
-      else if (r < 90 && g < 90 && b < 90) darkPixels++;
+      // Kartu layar HP harus putih terang bersih (tidak abu-abu gorden/dinding)
+      if (r > 195 && g > 195 && b > 195) {
+        whiteCardPixels++;
+      } else if (r > 150 && g < 75 && b < 75) {
+        redInkPixels++;
+      } else if (r < 75 && g < 75 && b < 75) {
+        darkInkPixels++;
+      }
     }
 
-    if (brightPixels < (64 * 80 * 0.25)) return null;
-    const suit = redPixels > darkPixels ? '♥' : '♠';
+    const totalPx = 64 * 80;
+    // Wajib ada minimal 45% latar kartu putih bersih AND minimal 4% tinta angka/simbol kontras
+    if (whiteCardPixels < totalPx * 0.45) return null;
+    if ((redInkPixels + darkInkPixels) < totalPx * 0.04) return null;
+
+    const suit = redInkPixels > darkInkPixels ? '♥' : '♠';
     if (!this.ocrWorker) return null;
 
-    // Ambil sudut kiri-atas kartu tempat angka/huruf berada
+    // Binarisasi (hitam-putih kontras tinggi) khusus area sudut kiri-atas angka kartu
     const rankCrop = document.createElement('canvas');
     rankCrop.width = 48;
     rankCrop.height = 48;
-    rankCrop.getContext('2d').drawImage(crop, 2, 2, 34, 38, 0, 0, 48, 48);
+    const rctx = rankCrop.getContext('2d');
+    rctx.drawImage(crop, 2, 2, 32, 36, 0, 0, 48, 48);
 
-    const { data: { text } } = await this.ocrWorker.recognize(rankCrop);
+    const rData = rctx.getImageData(0, 0, 48, 48);
+    for (let i = 0; i < rData.data.length; i += 4) {
+      const avg = (rData.data[i] + rData.data[i + 1] + rData.data[i + 2]) / 3;
+      const bw = avg < 145 ? 0 : 255;
+      rData.data[i] = bw;
+      rData.data[i + 1] = bw;
+      rData.data[i + 2] = bw;
+    }
+    rctx.putImageData(rData, 0, 0);
+
+    const { data: { text, confidence } } = await this.ocrWorker.recognize(rankCrop);
+    // Tolak hasil bacaan jika tingkat keyakinan OCR di bawah 65%
+    if (confidence < 65) return null;
+
     const clean = text.trim().toUpperCase().replace(/[^AKQJT0-9]/g, '');
+    if (!clean) return null;
 
     let label = null;
     if (clean.includes('10') || clean.includes('0')) label = '10';
-    else if (clean.includes('A')) label = 'A';
-    else if (clean.includes('K')) label = 'K';
-    else if (clean.includes('Q')) label = 'Q';
-    else if (clean.includes('J')) label = 'J';
-    else {
-      const match = clean.match(/[2-9]/);
-      if (match) label = match[0];
-    }
+    else if (clean === 'A') label = 'A';
+    else if (clean === 'K') label = 'K';
+    else if (clean === 'Q') label = 'Q';
+    else if (clean === 'J') label = 'J';
+    else if (/^[2-9]$/.test(clean)) label = clean;
 
     const rankObj = PokerEvaluator.RANKS.find(r => r.label === label);
     if (!rankObj) return null;
