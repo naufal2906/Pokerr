@@ -3,135 +3,132 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Poker HUD Pro Android</title>
+  <title>PKV AR Camera HUD Pro</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-  <div class="app-container">
-    <header class="app-header">
-      <div class="header-left">
-        <span class="app-title">♠ POKER HUD PRO</span>
-        <span id="scan-status-badge" class="blind-badge">Manual</span>
+  <div class="app-shell">
+    <!-- TOP BAR ALA MEJA PKV -->
+    <header class="pkv-topbar">
+      <div class="table-info">
+        <span class="table-name">Table 51 • 9-Max</span>
+        <span class="blind-pill">300 / 600</span>
       </div>
-      <div class="header-actions">
-        <button type="button" id="btn-glass-mode" class="btn-glass">👓 Glass</button>
-        <button type="button" id="btn-auto-scan" class="btn-scan">📷 Scan</button>
+      <div class="pot-pill">
+        <span>POT:</span>
+        <input type="number" id="input-pot" value="1800" step="300" min="0">
+      </div>
+      <div class="top-actions">
+        <button type="button" id="btn-cam-scan" class="btn-cam">📷 Kamera</button>
         <button type="button" id="btn-reset" class="btn-reset">Reset</button>
       </div>
     </header>
 
-    <!-- PANEL PREVIEW & KALIBRASI SCAN LAYAR -->
-    <div id="scanner-box" class="scanner-panel hidden">
-      <div class="scanner-top">
-        <span class="scanner-title">🔴 LIVE SCREEN SCANNER</span>
-        <div class="scanner-btns">
-          <button type="button" id="btn-calibrate" class="btn-mini">⚙️ Geser Area</button>
-          <button type="button" id="btn-stop-scan" class="btn-mini danger">Stop</button>
-        </div>
-      </div>
-      <div class="preview-wrapper">
-        <canvas id="scan-preview-canvas" width="270" height="480"></canvas>
-      </div>
-      <div id="calib-controls" class="calib-controls hidden">
-        <div class="calib-row">
-          <label>Posisi Y Meja: <span id="val-comm-y">31.5%</span></label>
-          <input type="range" id="range-comm-y" min="20" max="55" step="0.5" value="31.5">
-        </div>
-        <div class="calib-row">
-          <label>Posisi Y Kartu Kita: <span id="val-hole-y">62.5%</span></label>
-          <input type="range" id="range-hole-y" min="45" max="82" step="0.5" value="62.5">
-        </div>
-      </div>
-    </div>
+    <!-- ARENA MEJA PKV + KAMERA REAL-TIME -->
+    <main class="pkv-table-arena" id="table-arena">
+      <!-- Latar Kamera Belakang iOS (Aktif saat tombol Kamera ditekan) -->
+      <video id="ar-camera-video" autoplay muted playsinline class="hidden"></video>
+      <canvas id="ar-process-canvas" width="360" height="640" class="hidden"></canvas>
 
-    <!-- HUD ATAS: OUTS SISA KARTU DI LUAR MEJA -->
-    <div id="hud-outs-bar" class="hud-panel">
-      <div class="hud-label">OUTS SISA KARTU (Tap kartu jika sudah keluar):</div>
-      <div id="hud-outs-chips" class="hud-card-list">
-        <span class="muted-text">Pilih / Scan 2 kartu tangan dulu</span>
-      </div>
-    </div>
+      <!-- Garis Bingkai Meja Lonjong PKV -->
+      <div class="pkv-oval-felt"></div>
 
-    <!-- AREA KARTU TANGAN & KARTU KOMUNITAS MEJA -->
-    <div class="table-section">
-      <div class="card-group">
-        <div class="group-header">
-          <span>KARTU KITA</span>
-          <span id="current-hand-badge" class="combo-badge">-</span>
+      <!-- KONTROL KALIBRASI KAMERA (MUNCUL SAAT KAMERA AKTIF) -->
+      <div id="cam-toolbar" class="cam-toolbar hidden">
+        <span id="scan-badge" class="scan-status">🔴 SCAN AKTIF</span>
+        <button type="button" id="btn-toggle-calib" class="btn-mini">⚙️ Geser Kotak</button>
+        <button type="button" id="btn-stop-cam" class="btn-mini danger">Tutup Cam</button>
+      </div>
+
+      <div id="calib-panel" class="calib-panel hidden">
+        <div class="calib-item">
+          <label>Tinggi Kartu Meja: <span id="lbl-comm-y">33%</span></label>
+          <input type="range" id="slider-comm-y" min="20" max="55" step="0.5" value="33">
         </div>
-        <div class="slots-row" id="hole-slots">
-          <div class="card-slot active-slot" data-type="hole" data-index="0">?</div>
-          <div class="card-slot" data-type="hole" data-index="1">?</div>
+        <div class="calib-item">
+          <label>Tinggi Kartu Kita: <span id="lbl-hole-y">64%</span></label>
+          <input type="range" id="slider-hole-y" min="48" max="82" step="0.5" value="64">
         </div>
       </div>
 
-      <div class="card-group">
-        <div class="group-header">
-          <span>MEJA (KOMUNITAS)</span>
-          <span id="stage-badge" class="stage-badge">PRE-FLOP</span>
-        </div>
-        <div class="slots-row" id="comm-slots">
-          <div class="card-slot" data-type="comm" data-index="0">F1</div>
-          <div class="card-slot" data-type="comm" data-index="1">F2</div>
-          <div class="card-slot" data-type="comm" data-index="2">F3</div>
-          <div class="card-slot" data-type="comm" data-index="3">T</div>
-          <div class="card-slot" data-type="comm" data-index="4">R</div>
+      <!-- 1. HUD ATAS MEJA: OUTS SISA KARTU DI LUAR MEJA -->
+      <div class="hud-overlay-top">
+        <div class="hud-mini-label">OUTS SISA KARTU (Tap jika mati):</div>
+        <div id="hud-outs-chips" class="outs-row">
+          <span class="muted">Arahkan kamera ke meja atau tap kartu</span>
         </div>
       </div>
-    </div>
 
-    <!-- HUD BAWAH: PERSENTASE MEJA, TARGET KITA & KEPUTUSAN POT ODDS -->
-    <div id="hud-combo-bar" class="hud-panel">
-      <div class="hud-row">
-        <span class="hud-tag tag-board">MEJA:</span>
-        <span id="hud-board-pct" class="hud-val">Belum Ada Kartu Meja</span>
-      </div>
-      <div class="hud-row">
-        <span class="hud-tag tag-hero">KITA:</span>
-        <span id="hud-hero-target" class="hud-val highlight">Pilih / Scan 2 Kartu Tangan</span>
+      <!-- 2. TENGAH MEJA: KARTU KOMUNITAS (3 FLOP ATAS + 2 TURN/RIVER BAWAH) -->
+      <div class="community-zone" id="comm-zone">
+        <div class="zone-caption">
+          <span id="stage-badge">PRE-FLOP</span> • <span id="current-hand-badge">-</span>
+        </div>
+        <div class="comm-row-top">
+          <div class="pkv-card-slot" data-type="comm" data-index="0">F1</div>
+          <div class="pkv-card-slot" data-type="comm" data-index="1">F2</div>
+          <div class="pkv-card-slot" data-type="comm" data-index="2">F3</div>
+        </div>
+        <div class="comm-row-bottom">
+          <div class="pkv-card-slot" data-type="comm" data-index="3">T</div>
+          <div class="pkv-card-slot" data-type="comm" data-index="4">R</div>
+        </div>
       </div>
 
-      <!-- KALKULATOR CEPAT POT & BET LAWAN -->
-      <div class="pot-odds-box">
-        <div class="pot-inputs">
-          <div class="input-mini">
-            <label for="input-pot">Total Pot</label>
-            <input type="number" id="input-pot" value="1800" step="300" min="0">
-          </div>
-          <div class="input-mini">
-            <label for="input-bet">Bet / Raise Lawan</label>
+      <!-- 3. BAWAH KARTU KOMUNITAS: PERSENTASE MEJA, TARGET KITA & KEPUTUSAN -->
+      <div class="hud-overlay-mid">
+        <div class="stat-line">
+          <span class="badge-meja">MEJA</span>
+          <span id="hud-board-pct" class="stat-text">Belum Ada Kartu Meja</span>
+        </div>
+        <div class="stat-line">
+          <span class="badge-kita">KITA</span>
+          <span id="hud-hero-target" class="stat-text cyan">Scan / Pilih 2 Kartu Tangan</span>
+        </div>
+
+        <!-- BARIS CEPAT BET LAWAN & KEPUTUSAN -->
+        <div class="bet-control-strip">
+          <div class="bet-input-wrap">
+            <span>Bet Lawan:</span>
             <input type="number" id="input-bet" value="600" step="300" min="0">
           </div>
-        </div>
-        <div class="quick-bet-btns">
-          <button type="button" class="qbet" data-bet="0">Check (0)</button>
-          <button type="button" class="qbet" data-bet="600">600</button>
-          <button type="button" class="qbet" data-bet="1800">1.8k</button>
-          <button type="button" class="qbet" data-bet="6000">6k</button>
-          <button type="button" class="qbet" data-bet="15000">All-In</button>
+          <div class="quick-bets">
+            <button type="button" class="qbet" data-bet="0">0</button>
+            <button type="button" class="qbet" data-bet="600">600</button>
+            <button type="button" class="qbet" data-bet="1800">1.8k</button>
+            <button type="button" class="qbet" data-bet="6000">6k</button>
+            <button type="button" class="qbet" data-bet="15000">All-In</button>
+          </div>
         </div>
 
-        <div id="decision-banner" class="decision-banner verdict-call">
-          <div id="decision-verdict" class="verdict-title">MENUNGGU KARTU</div>
-          <div id="decision-detail" class="verdict-sub">Aktifkan Scan layar atau tap kartu manual.</div>
+        <div id="decision-banner" class="decision-bar verdict-call">
+          <strong id="decision-verdict">MENUNGGU KARTU</strong>
+          <span id="decision-detail">Tekan 📷 Kamera untuk scan layar HP main</span>
         </div>
       </div>
-    </div>
 
-    <!-- KEYPAD KOREKSI CEPAT / MANUAL -->
-    <div class="picker-panel">
-      <div class="suit-tabs" id="suit-tabs">
-        <button type="button" class="suit-btn active" data-suit="♠">♠ Sekop</button>
-        <button type="button" class="suit-btn red" data-suit="♥">♥ Hati</button>
-        <button type="button" class="suit-btn" data-suit="♣">♣ Keriting</button>
-        <button type="button" class="suit-btn red" data-suit="♦">♦ Wajik</button>
+      <!-- 4. KURSI BAWAH (HERO): 2 KARTU KITA -->
+      <div class="hero-seat-zone" id="hole-zone">
+        <div class="hero-cards">
+          <div class="pkv-card-slot active-slot" data-type="hole" data-index="0">?</div>
+          <div class="pkv-card-slot" data-type="hole" data-index="1">?</div>
+        </div>
+        <div class="hero-plate">HERO (KURSI KITA)</div>
       </div>
-      <div class="rank-grid" id="rank-grid"></div>
-    </div>
+    </main>
+
+    <!-- KEYPAD KOREKSI MANUAL / CEPAT DI BAGIAN BAWAH -->
+    <footer class="keypad-dock">
+      <div class="suit-bar" id="suit-tabs">
+        <button type="button" class="suit-btn active" data-suit="♠">♠</button>
+        <button type="button" class="suit-btn red" data-suit="♥">♥</button>
+        <button type="button" class="suit-btn" data-suit="♣">♣</button>
+        <button type="button" class="suit-btn red" data-suit="♦">♦</button>
+      </div>
+      <div class="rank-bar" id="rank-grid"></div>
+    </footer>
   </div>
-
-  <video id="screen-video" autoplay muted playsinline style="display:none;"></video>
 
   <script src="evaluator.js"></script>
   <script src="app.js"></script>
